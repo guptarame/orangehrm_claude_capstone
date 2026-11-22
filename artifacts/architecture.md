@@ -13,7 +13,9 @@ The architecture described below is **already implemented**. This document recor
 validates it for the Design Review, Planner, Implementation, and Verify agents; it is
 not a proposal for greenfield construction. Where the existing code could not be
 reconciled with `artifacts/requirements.md`, the discrepancy is raised in
-[Open Questions](#open-questions) rather than resolved by assumption.
+[Open Questions](#open-questions) rather than resolved by assumption. Each of those
+questions has since been ruled on by the Design Review Agent (Step 3) — see
+`artifacts/design-review.md` for the findings (`DR-018`+) and agreed decisions.
 
 ## Architectural Goals and Drivers
 
@@ -341,7 +343,10 @@ the system under test is an externally operated site.
   scaffolding — there is no workflow that builds or runs this suite, and no published
   report or artifact retention. `headless=true` and `-D` secret injection already make
   the framework CI-ready, so adding a workflow is a small, self-contained change.
-  Raised as an open question below rather than assumed.
+  **Ruled on by `DR-022`:** flagged as a real gap but deliberately not fixed in this
+  run — local, on-demand verification is the accepted operating model for the capstone
+  (Step 7 supplies the execution evidence), with the consequence that Step 8's PR
+  carries no automated check. Escalated to the user for confirmation.
 
 ## Assumptions and Constraints
 
@@ -359,6 +364,13 @@ the system under test is an externally operated site.
   logic.
 - `FR-001` is verified by exactly one scenario, `@TS_LOG_008`, and its three
   `// FR-001`-tagged step methods.
+- The footer's visibility is established **transitively and sufficiently** by its two
+  descendant checks: both locators are descendant-scoped to `.orangehrm-login-footer`,
+  so a match is impossible unless that container is in the DOM, and
+  `visibilityOfElementLocated` on a descendant cannot succeed while an ancestor is
+  `display:none` or zero-sized. No footer-container locator is needed, and a direct
+  container check would be *weaker* (a visible empty footer would pass it). Confirmed
+  by `DR-021`; previously listed below as an assumption.
 
 **Assumptions (not verifiable from this repository alone):**
 
@@ -370,11 +382,13 @@ the system under test is an externally operated site.
   third-party and can change without notice — the single largest `FR-001` fragility.
 - The demo site is reachable and not rate-limiting; `@TS_LOG_008` cannot pass offline,
   and this framework has no stub or recorded-DOM fallback.
-- The copyright and social-link elements are inside the footer container that the
-  locators are scoped to, so "footer is displayed" is inferred from its two children
-  rather than asserted on the footer element itself.
-- `FR-001`'s "footer" is treated as satisfied by one visible copyright element plus at
-  least one visible social link (see Open Questions).
+- ~~`FR-001`'s "footer" is treated as satisfied by one visible copyright element plus
+  at least one visible social link.~~ **Superseded by `DR-019`:** one visible social
+  link is *not* sufficient for `AC-001`'s plural "social links". The assertion is to
+  tighten to a minimum visible count in Step 4; until that task lands, the
+  one-link check is a known coverage gap rather than an accepted interpretation.
+  (The footer-inference half of this assumption is now a confirmed constraint above,
+  per `DR-021`.)
 
 ## Risks and Mitigations
 
@@ -382,10 +396,11 @@ the system under test is an externally operated site.
 | --- | --- | --- | --- |
 | Third-party demo-site markup change breaks an `FR-001` locator | Medium | High — `@TS_LOG_008` fails with no product defect | Locators scoped to hand-authored `orangehrm-*` class fragments rather than generated `oxd-*` chains; all confined to `LoginPage`, so the fix is one file. Failure message names the exact control. |
 | Demo site unreachable, slow, or rate-limiting | Medium | High — suite cannot run | 30 s page-load and 15 s explicit-wait timeouts fail fast with a clear message; failure screenshot distinguishes "site down" from "control missing". No mitigation for sustained outage (accepted: no stub layer). |
-| `@TS_LOG_008` couples `FR-001` to the out-of-scope `NFR-002` HTTPS step | High (already the case) | Medium — an `NFR-002` regression reports as a failure of the `FR-001` scenario | Documented here and raised in Open Questions. Step-level reporting still identifies which step failed; splitting the step into its own scenario would fully decouple them. |
+| `@TS_LOG_008` couples `FR-001` to the out-of-scope `NFR-002` HTTPS step | High (already the case) | Medium — an `NFR-002` regression reports as a failure of the `FR-001` scenario | **Resolved by `DR-020`:** the step moves to its own `@TS_LOG_013` scenario in Step 4, inheriting the same `Background`, which fully decouples the two requirements without losing the pre-submit check. Until then, step-level reporting still identifies which step failed. |
 | `@TS_LOG_008`'s three `FR-001` assertions span two concerns (presence and placeholder text) | Confirmed | Low | Each is a separate step with its own assertion, so the report pinpoints which one failed. |
-| Only one social link is asserted though `FR-001` says "social links" (plural) | Confirmed | Low-Medium — a partial footer regression could pass | Raised as Open Question 2 for the Design Review Agent to rule on; `waitForAllVisible` already exists in `BasePage` if a count assertion is wanted. |
-| Code cites `AD-###` / `DR-###` / `TASK-###` IDs whose source documents are absent from `artifacts/` | Confirmed | Medium — broken traceability chain; risk of ID collision if new `AD-###` IDs are minted | This document mints **no** new `AD-###` IDs and preserves the cited ones verbatim with their inferred meaning; raised as Open Question 1. |
+| Only one social link is asserted though `FR-001` says "social links" (plural) | Confirmed | Medium — a partial footer regression passes | **Accepted as a finding by `DR-019`** (not as an interpretation): tighten to a minimum visible count in a named constant, within the 3 s group budget. Note `BasePage.waitForAllVisible` currently has no callers and uses the 15 s `explicit.wait`, so it needs an explicit-timeout variant rather than reuse as-is (`DR-026`). |
+| `FR-001`'s quoted labels `"Login"` / `"Forgot your password?"` are located structurally but never text-asserted | Confirmed (found in Step 3) | Medium — a relabelled control passes `@TS_LOG_008` | **Accepted as a finding by `DR-023`:** add `LoginPage` text readers plus two `Then` steps comparing whitespace-normalised labels, mirroring the existing placeholder-assertion pattern. |
+| Code cites `AD-###` / `DR-###` / `TASK-###` IDs whose source documents are absent from `artifacts/` | Confirmed | Medium — broken traceability chain; risk of ID collision if new IDs are minted | **Resolved by `DR-018`:** this document mints no new `AD-###` IDs, preserves the cited ones with their inferred meaning, and § Traceability now fixes the allocation rule (`AD-010`+ / `DR-030`+ / `TASK-012`+, retired ranges never reused). |
 | Browser auto-update outpaces the driver binary | Low | Medium | WebDriverManager resolves matching binaries per run; `DriverManager` logs the browser and quits a half-initialised session. |
 | Demo credentials repointed at a non-public environment | Low | High | `ConfigReader.getValidPassword()` refuses the committed value off the demo host; `pre_implementation.md` requires confirming `base.url` before any change. Not on `FR-001`'s path (it needs no credentials). |
 | Latent parallelism assumed to be active | Medium | Low-Medium — misleading capacity expectations | Documented explicitly in Scalability: `ThreadLocal` is in place but the JUnit 4 runner and Surefire config do not execute scenarios in parallel. |
@@ -396,6 +411,20 @@ the system under test is an externally operated site.
 | --- | --- | --- | --- | --- |
 | `FR-001` (`AC-001`) | `LoginPage` (`findMissingLoginControls`, `getUsernamePlaceholder`, `getPasswordPlaceholder`, `open`) → `BasePage` → `DriverManager` / `ConfigReader` | `features/login.feature` `@TS_LOG_008` | `LoginSteps.all_required_login_controls_should_be_displayed()`, `.the_username_field_placeholder_should_be()`, `.the_password_field_placeholder_should_be()` (all tagged `// FR-001`) | Implemented — covered, no orphan |
 | `NFR-002` | `ConfigReader.getBaseUrl()` (preventive guard); `LoginSteps.the_current_page_should_be_served_over_https()` (executed, defence-in-depth) | `@TS_LOG_008` and `@TS_LOG_001` (`# NFR-002` comments) | `ConfigReader`, `LoginSteps`, `ConfigReaderTest` | Implemented — **out of scope for `FR-001`**; mapped here for completeness only, per `artifacts/requirements.md` § Out of Scope |
+
+**ID allocation rule (decided by `DR-018`, Step 3).** This document at commit
+`b448cb4` is the numbering baseline. New IDs are allocated strictly **above every ID
+cited anywhere in the code**, because a prior document demonstrably numbered as far as
+`DR-017` even though `DR-004`-`DR-016` are uncited:
+
+| ID family | Next free ID | Permanently retired — never reuse, renumber, or reinterpret |
+| --- | --- | --- |
+| `AD-###` (architecture decision) | `AD-010` | `AD-001` - `AD-009` |
+| `DR-###` (design-review finding) | `DR-030` (`DR-018`-`DR-029` used by Step 3) | `DR-001` - `DR-017` |
+| `TASK-###` (implementation task) | `TASK-012` | `TASK-001` - `TASK-011` |
+
+The retired IDs keep their existing code comments untouched and stay listed below as
+`Not Found` provenance.
 
 Pre-existing decision/task IDs referenced by code comments, whose defining documents
 are **not present** in `artifacts/`:
@@ -411,37 +440,35 @@ are **not present** in `artifacts/`:
 
 ## Open Questions
 
-1. **Orphaned `AD-###` / `DR-###` / `TASK-###` IDs.** Code and `pom.xml` reference
-   `AD-008`, `AD-009`, `DR-001`, `DR-002`, `DR-003`, `DR-017`, and `TASK-001/002/003/011`,
-   but `artifacts/` contains only `requirements.md` and `ORCHESTRATION_LOG.md` — the
-   `architecture.md`, `design-review.md`, and `impl-plan.md` that defined those IDs are
-   absent. Per the never-renumber rule this document deliberately **mints no new
-   `AD-###` IDs** and only records the cited ones with their inferred meaning above.
-   *Decision needed:* should Step 3/Step 4 (a) adopt this document as the new baseline
-   and continue `AD-###` numbering from `AD-010` to avoid collision, (b) reconstruct
-   the prior documents, or (c) renumber the code comments? **Do not** reuse
-   `AD-001`-`AD-007` until their original meaning is known.
-2. **Does `FR-001`'s "footer … social links" require more than one link?**
-   `FR-001` and `AC-001` say "social links" (plural), but
-   `findMissingLoginControls()` asserts visibility of a single
-   `.orangehrm-login-footer .orangehrm-login-footer-sm a` match — so a regression that
-   removed all but one social link would still pass. *Decision needed:* accept
-   "at least one social link" as sufficient evidence the footer rendered, or tighten to
-   an expected minimum count (`BasePage.waitForAllVisible` already supports this)?
-   Not resolved here because it would change `FR-001`'s effective strictness.
-3. **Should the `NFR-002` HTTPS step stay inside the `FR-001` scenario?**
-   `@TS_LOG_008` ends with `And the current page should be served over HTTPS`, which
-   `artifacts/requirements.md` places explicitly **out of scope** for `FR-001`. As
-   written, an `NFR-002` regression fails the scenario that `FR-001` is traced to.
-   *Decision needed:* leave it (pragmatic — the page is already open) or move it to a
-   dedicated `NFR-002` scenario so each requirement has an independently failing test?
-4. **Is the footer itself asserted, or only inferred?** No locator targets the
-   `.orangehrm-login-footer` container directly; its presence is inferred from two
-   descendants being visible. *Decision needed:* is child-element visibility accepted
-   as satisfying `AC-001`'s "footer … are all visible", or should the container be
-   asserted explicitly as an eighth control?
-5. **Is the absence of CI intentional?** No workflow builds or runs this suite
-   (`.github/` holds only `modernize/java-upgrade` scaffolding), so `FR-001` is verified
-   only on demand locally. The framework is already CI-ready via `headless=true` and
-   `-D` overrides. *Decision needed:* add a workflow in a later step, or is local,
-   on-demand verification the accepted operating model for this capstone?
+All five questions raised by Step 2 were ruled on by the Design Review Agent (Step 3)
+in `artifacts/design-review.md`. The rulings are summarised below so no downstream
+agent re-opens a settled question; `artifacts/design-review.md` holds the full
+finding, impact, and recommendation for each.
+
+| Step 2 question | Ruling (Step 3) | Finding | Disposition |
+| --- | --- | --- | --- |
+| 1. Orphaned `AD-###` / `DR-###` / `TASK-###` IDs | **Option (a).** This document (commit `b448cb4`) is the numbering baseline; new IDs are allocated strictly **above every cited ID** — `AD-010`+, `DR-018`+, `TASK-012`+. Reconstructing the prior documents (b) and renumbering the code comments (c) were both rejected. See § Traceability for the rule. | `DR-018` | Resolved |
+| 2. Does "social links" require more than one link? | **A real coverage gap, not an accepted one.** The plural is explicit in approved requirement text, so the assertion must tighten to a minimum visible social-link count (≥ 2) held in a named constant, within the existing 3 s per-control budget. Routed to Step 4 as a task. | `DR-019` (with `DR-026`) | Accepted — Step 4 |
+| 3. Should the `NFR-002` HTTPS step stay inside `@TS_LOG_008`? | **No — split it.** The step moves to its own scenario (`@TS_LOG_013`), inheriting the same `Background` so coverage is split rather than reduced; the `@TS_LOG_001` occurrence stays. Bundling was rejected: one scenario per requirement is what the traceability chain depends on, and the preventive `ConfigReader` guard is unaffected. Routed to Step 4. | `DR-020` | Accepted — Step 4 |
+| 4. Is the footer itself asserted, or only inferred? | **Inference is sufficient; no change.** Descendant-scoped visibility is strictly stronger evidence than a container check, which a visible-but-empty footer would pass. No eighth control is added. Now recorded as a confirmed constraint, not an assumption. | `DR-021` | Closed — accepted |
+| 5. Is the absence of CI intentional? | **In scope to flag, out of scope to fix in this run.** Local, on-demand execution is the accepted operating model for the capstone; the gap stays on the record and the framework stays CI-ready. Escalated to the user for confirmation. | `DR-022` | Deferred — user |
+
+Two questions remain genuinely open, both requiring a **user** decision and neither
+blocking Step 4:
+
+- **`DR-024` — `NFR-002` is cited everywhere but defined nowhere.** This document, the
+  feature file, `ConfigReader`, `ConfigReaderTest`, and `LoginSteps` all reference
+  `NFR-002`, yet `artifacts/requirements.md` mentions it only inside § Out of Scope as
+  a pointer to work "tracked separately" — there is no `NFR-002` statement, measurable
+  target, or acceptance criterion in any artifact, and no `NFR-001` exists. Choose:
+  (i) amend `requirements.md` via a Step 1 revision with a measurable `NFR-002`, or
+  (ii) record `NFR-002` formally as inherited from unavailable prior work and out of
+  scope, accepting that Step 7 cannot verify it. Neither Step 2 nor Step 3 may invent
+  the definition.
+- **`DR-022` — confirm local-only verification.** See the table above. Without a
+  workflow there is no push/PR regression signal and no report retention, and Step 8
+  will open a PR with no automated check attached.
+
+Additionally, `DR-023` (raised in Step 3, not by this document) found that `FR-001`'s
+quoted control labels `"Login"` and `"Forgot your password?"` are located structurally
+but never text-asserted, unlike the two placeholders. Accepted and routed to Step 4.
