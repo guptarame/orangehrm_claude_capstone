@@ -205,6 +205,22 @@ decision), `DR-024` (the `NFR-002` definition itself — open user decision), an
 
 ### TASK-014: Split the NFR-002 HTTPS assertion out of @TS_LOG_008 into @TS_LOG_013
 
+- **Status:** Done — implemented and committed as `f45c376`
+  (`src/test/resources/features/login.feature` only; no Java changes). Removed the
+  trailing `# NFR-002` comment and `And the current page should be served over HTTPS`
+  step from `@TS_LOG_008`; added a new `@TS_LOG_013 @security` scenario "Login page is
+  served over HTTPS" immediately after it, carrying the relocated (reworded)
+  `# NFR-002` comment and a single `Then the current page should be served over HTTPS`
+  step, relying solely on the inherited `Background`. `@TS_LOG_001`'s own HTTPS
+  step/comment left untouched; `the_current_page_should_be_served_over_https()` in
+  `LoginSteps.java` reused unchanged. Validation:
+  `mvn test -Dcucumber.filter.tags="@TS_LOG_013"` — 1 scenario, 2 steps, passed;
+  `mvn test -Dcucumber.filter.tags="@TS_LOG_008"` — 1 scenario, 6 steps, passed, no
+  HTTPS step present; full suite `mvn test` — 13 scenarios (12 passed, 1 failed), 46
+  steps (45 passed, 1 failed), with the only failure being the pre-existing
+  `@TS_LOG_009` loading-indicator issue (unchanged, not touched by this task). Manual
+  diff confirmed a pure relocation (one step removed, one scenario added, no
+  duplication or loss) and `@TS_LOG_001` byte-for-byte unchanged.
 - **Priority:** Medium
 - **FR/NFR:** NFR-002 (cited by the existing `# NFR-002` code-comment convention only —
   **no artifact defines `NFR-002`**, see `DR-024`); protects `FR-001`'s 1:1
