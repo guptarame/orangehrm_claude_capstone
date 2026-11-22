@@ -94,6 +94,15 @@ decision), `DR-024` (the `NFR-002` definition itself — open user decision), an
 
 ### TASK-012: Tighten the footer social-link assertion to a minimum visible count
 
+- **Status:** Done — implemented and committed as `58b5691` (`src/test/java/com/orangehrm/pages/BasePage.java`,
+  `src/test/java/com/orangehrm/pages/LoginPage.java`). Live DOM check confirmed 4
+  visible footer social links at implementation time, above the `MIN_FOOTER_SOCIAL_LINKS = 2`
+  floor, so no escalation was needed. `mvn test -Dcucumber.filter.tags="@TS_LOG_008"`
+  passes; negative proof (temporarily raising the floor to 99) failed with the
+  expected `footer social-media links (expected at least 99)` message, then reverted.
+  Full suite: 11/12 scenarios pass; `@TS_LOG_009` (loading indicator) fails but was
+  confirmed pre-existing and unrelated to this task (reproduced on the pre-change
+  code, outside `TASK-012`'s scope) — flagged to the user rather than silently fixed.
 - **Priority:** High
 - **FR/NFR:** FR-001 (AC-001)
 - **Architecture section:** § Key Components and Responsibilities
@@ -143,6 +152,20 @@ decision), `DR-024` (the `NFR-002` definition itself — open user decision), an
 
 ### TASK-013: Assert the literal "Login" and "Forgot your password?" control labels
 
+- **Status:** Done — implemented and committed as `1d477ad` (`src/test/java/com/orangehrm/pages/LoginPage.java`,
+  `src/test/java/com/orangehrm/stepdefinitions/LoginSteps.java`,
+  `src/test/resources/features/login.feature`). `getLoginButtonText()` /
+  `getForgotPasswordLinkText()` readers added to `LoginPage` alongside the placeholder
+  readers (trimmed, whitespace-collapsed); two `// FR-001` `@Then` bindings added to
+  `LoginSteps`; two `And` steps with literal values `"Login"` and
+  `"Forgot your password?"` added to `@TS_LOG_008`. `mvn test -Dcucumber.filter.tags="@TS_LOG_008"`
+  passes (7/7 steps, no `undefined` steps). Negative proof: temporarily changed the
+  expected Login-button label to `"Sign in"`; the scenario failed with
+  `org.junit.ComparisonFailure: expected:<[Sign ]in> but was:<[Log]in>`, confirming the
+  assertion detects a mislabel; reverted before committing. Full suite:
+  11/12 scenarios pass (45 steps, 44 passed); `@TS_LOG_009` (loading indicator) fails but
+  is the same pre-existing, unrelated failure already flagged in `TASK-012` — not
+  reintroduced or worsened by this task, and not fixed here (out of scope).
 - **Priority:** High
 - **FR/NFR:** FR-001 (AC-001)
 - **Architecture section:** § Key Components and Responsibilities (`pages/LoginPage`
@@ -182,6 +205,22 @@ decision), `DR-024` (the `NFR-002` definition itself — open user decision), an
 
 ### TASK-014: Split the NFR-002 HTTPS assertion out of @TS_LOG_008 into @TS_LOG_013
 
+- **Status:** Done — implemented and committed as `f45c376`
+  (`src/test/resources/features/login.feature` only; no Java changes). Removed the
+  trailing `# NFR-002` comment and `And the current page should be served over HTTPS`
+  step from `@TS_LOG_008`; added a new `@TS_LOG_013 @security` scenario "Login page is
+  served over HTTPS" immediately after it, carrying the relocated (reworded)
+  `# NFR-002` comment and a single `Then the current page should be served over HTTPS`
+  step, relying solely on the inherited `Background`. `@TS_LOG_001`'s own HTTPS
+  step/comment left untouched; `the_current_page_should_be_served_over_https()` in
+  `LoginSteps.java` reused unchanged. Validation:
+  `mvn test -Dcucumber.filter.tags="@TS_LOG_013"` — 1 scenario, 2 steps, passed;
+  `mvn test -Dcucumber.filter.tags="@TS_LOG_008"` — 1 scenario, 6 steps, passed, no
+  HTTPS step present; full suite `mvn test` — 13 scenarios (12 passed, 1 failed), 46
+  steps (45 passed, 1 failed), with the only failure being the pre-existing
+  `@TS_LOG_009` loading-indicator issue (unchanged, not touched by this task). Manual
+  diff confirmed a pure relocation (one step removed, one scenario added, no
+  duplication or loss) and `@TS_LOG_001` byte-for-byte unchanged.
 - **Priority:** Medium
 - **FR/NFR:** NFR-002 (cited by the existing `# NFR-002` code-comment convention only —
   **no artifact defines `NFR-002`**, see `DR-024`); protects `FR-001`'s 1:1

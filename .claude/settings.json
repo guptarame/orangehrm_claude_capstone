@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git branch*)",
+      "Bash(git checkout*)",
+      "Bash(gh pr*)",
+      "Bash(gh issue*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "attribution": {
+    "commit": "Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>",
+    "pr": "\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)"
+  },
+  "includeGitInstructions": false,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git commit*)",
+        "hooks": [
+         ]
+      }
+    ],
+    "PostToolUse": [
+    ],
+    "Stop": [
+      {
+        "hooks": [
+        ]
+      }
+    ]
+  }
+}
