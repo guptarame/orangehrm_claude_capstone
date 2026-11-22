@@ -58,8 +58,11 @@ Feature: OrangeHRM Login
     And the Password field placeholder should be "Password"
     And the Login button text should be "Login"
     And the Forgot-password link text should be "Forgot your password?"
-    # NFR-002: preventive-guard defence-in-depth check on the pre-submit login page.
-    And the current page should be served over HTTPS
+
+  @TS_LOG_013 @security
+  Scenario: Login page is served over HTTPS
+    # NFR-002: relocated preventive-guard defence-in-depth check on the pre-submit login page.
+    Then the current page should be served over HTTPS
 
   @TS_LOG_009 @ui @timing
   Scenario: Loading indicator is shown while authentication is in progress
