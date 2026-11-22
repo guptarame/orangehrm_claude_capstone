@@ -152,6 +152,20 @@ decision), `DR-024` (the `NFR-002` definition itself — open user decision), an
 
 ### TASK-013: Assert the literal "Login" and "Forgot your password?" control labels
 
+- **Status:** Done — implemented and committed as `1d477ad` (`src/test/java/com/orangehrm/pages/LoginPage.java`,
+  `src/test/java/com/orangehrm/stepdefinitions/LoginSteps.java`,
+  `src/test/resources/features/login.feature`). `getLoginButtonText()` /
+  `getForgotPasswordLinkText()` readers added to `LoginPage` alongside the placeholder
+  readers (trimmed, whitespace-collapsed); two `// FR-001` `@Then` bindings added to
+  `LoginSteps`; two `And` steps with literal values `"Login"` and
+  `"Forgot your password?"` added to `@TS_LOG_008`. `mvn test -Dcucumber.filter.tags="@TS_LOG_008"`
+  passes (7/7 steps, no `undefined` steps). Negative proof: temporarily changed the
+  expected Login-button label to `"Sign in"`; the scenario failed with
+  `org.junit.ComparisonFailure: expected:<[Sign ]in> but was:<[Log]in>`, confirming the
+  assertion detects a mislabel; reverted before committing. Full suite:
+  11/12 scenarios pass (45 steps, 44 passed); `@TS_LOG_009` (loading indicator) fails but
+  is the same pre-existing, unrelated failure already flagged in `TASK-012` — not
+  reintroduced or worsened by this task, and not fixed here (out of scope).
 - **Priority:** High
 - **FR/NFR:** FR-001 (AC-001)
 - **Architecture section:** § Key Components and Responsibilities (`pages/LoginPage`
