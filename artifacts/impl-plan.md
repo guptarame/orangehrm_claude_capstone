@@ -94,6 +94,15 @@ decision), `DR-024` (the `NFR-002` definition itself — open user decision), an
 
 ### TASK-012: Tighten the footer social-link assertion to a minimum visible count
 
+- **Status:** Done — implemented and committed as `58b5691` (`src/test/java/com/orangehrm/pages/BasePage.java`,
+  `src/test/java/com/orangehrm/pages/LoginPage.java`). Live DOM check confirmed 4
+  visible footer social links at implementation time, above the `MIN_FOOTER_SOCIAL_LINKS = 2`
+  floor, so no escalation was needed. `mvn test -Dcucumber.filter.tags="@TS_LOG_008"`
+  passes; negative proof (temporarily raising the floor to 99) failed with the
+  expected `footer social-media links (expected at least 99)` message, then reverted.
+  Full suite: 11/12 scenarios pass; `@TS_LOG_009` (loading indicator) fails but was
+  confirmed pre-existing and unrelated to this task (reproduced on the pre-change
+  code, outside `TASK-012`'s scope) — flagged to the user rather than silently fixed.
 - **Priority:** High
 - **FR/NFR:** FR-001 (AC-001)
 - **Architecture section:** § Key Components and Responsibilities
