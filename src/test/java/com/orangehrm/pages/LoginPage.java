@@ -199,6 +199,28 @@ public class LoginPage extends BasePage {
     }
 
     /**
+     * Returns the Login button's visible text, trimmed and with internal
+     * whitespace collapsed, so DOM-whitespace formatting cannot cause a
+     * false mismatch against the expected label (FR-001).
+     */
+    public String getLoginButtonText() {
+        return normalizeWhitespace(waitForVisible(LOGIN_BUTTON).getText());
+    }
+
+    /**
+     * Returns the "Forgot your password?" link's visible text, trimmed and
+     * with internal whitespace collapsed, so DOM-whitespace formatting
+     * cannot cause a false mismatch against the expected label (FR-001).
+     */
+    public String getForgotPasswordLinkText() {
+        return normalizeWhitespace(waitForVisible(FORGOT_PASSWORD_LINK).getText());
+    }
+
+    private static String normalizeWhitespace(String text) {
+        return text == null ? null : text.trim().replaceAll("\\s+", " ");
+    }
+
+    /**
      * Checks for the transient loading indicator shown on the submit button
      * while an authentication request is in flight. Uses a short timeout
      * since the indicator is expected to appear (and often disappear)
