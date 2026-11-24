@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TASK-001 (artifacts/impl-plan.md): Maven bootstrap for the OrangeHRM login
+  BDD test framework. FR-001 (enabling). AD-001 (Selenium + Cucumber-JVM +
+  JUnit 4 stack, Maven + Surefire build). There is no src/main — every
+  dependency is test-scoped because this repository is a test framework, not
+  a deployable application (.claude/CLAUDE.md).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.orangehrm</groupId>
+  <artifactId>orangehrm-login-tests</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>OrangeHRM Login Test Automation</name>
+  <description>
+    Selenium + Cucumber-JVM + JUnit 4 BDD test automation framework verifying
+    FR-001 (login page controls) against the public OrangeHRM demo instance.
+  </description>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>11</maven.compiler.release>
+
+    <selenium.version>4.27.0</selenium.version>
+    <cucumber.version>7.20.1</cucumber.version>
+    <junit.version>4.13.2</junit.version>
+    <webdrivermanager.version>5.9.2</webdrivermanager.version>
+    <slf4j.version>2.0.16</slf4j.version>
+
+    <maven.surefire.version>3.5.2</maven.surefire.version>
+    <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+  </properties>
+
+  <dependencies>
+    <!-- AD-001: browser automation -->
+    <dependency>
+      <groupId>org.seleniumhq.selenium</groupId>
+      <artifactId>selenium-java</artifactId>
+      <version>${selenium.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- AD-001: specification + glue layer -->
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-java</artifactId>
+      <version>${cucumber.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-junit</artifactId>
+      <version>${cucumber.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- AD-001: test runner -->
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Driver binary resolution (no committed binaries, no manual PATH setup) -->
+    <dependency>
+      <groupId>io.github.bonigarcia</groupId>
+      <artifactId>webdrivermanager</artifactId>
+      <version>${webdrivermanager.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Logging: SLF4J API + a simple binding, per architecture Technology Choices -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>${slf4j.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>${slf4j.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!--
+      TASK-012 addition (not in the original AD-001 stack table): JUnit 4 has
+      no supported API to set an environment variable for the running JVM,
+      and ConfigReaderTest (AD-004) must deterministically prove env >
+      file precedence without OS-level setup. system-rules' EnvironmentVariables
+      @Rule is the established way to do this; it requires the add-opens
+      flags configured on the Surefire argLine below.
+    -->
+    <dependency>
+      <groupId>com.github.stefanbirkner</groupId>
+      <artifactId>system-rules</artifactId>
+      <version>1.19.0</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>${maven.compiler.plugin.version}</version>
+      </plugin>
+
+      <!--
+        Surefire include patterns per .claude/CLAUDE.md "ConfigReaderTest.java
+        is the only unit-test class (Surefire **/*Test.java pattern)" and
+        TASK-001's validation: TestRunner.java (Cucumber entry point) plus any
+        **/*Test.java (e.g. ConfigReaderTest, TASK-012).
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven.surefire.version}</version>
+        <configuration>
+          <includes>
+            <include>**/TestRunner.java</include>
+            <include>**/*Test.java</include>
+          </includes>
+          <!-- Required by ConfigReaderTest's system-rules EnvironmentVariables @Rule (TASK-012) on JDK 9+. -->
+          <argLine>--add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
