@@ -20,6 +20,9 @@ Load and follow the `plan-implementation` skill. It owns the full workflow: read
 Do not duplicate the task format, prioritization rules, or document structure here
 — the skill is the single source of truth.
 
+## I/O Log
+After `artifacts/impl-plan.md` is written (and before the Gate below), append one row to `generateDocs/planner.md`'s Run Log table — increment `Run #`, record the timestamp, the input source (`artifacts/architecture.md` and its commit), the output artifact/IDs (e.g. `impl-plan.md` — TASK-001..TASK-###), status (`Approved` / `Pending review` / `Changes requested`), and a one-line note. Never rewrite or delete a prior row. Commit the log update together with `artifacts/impl-plan.md`.
+
 ## Gate
 - Step 4 runs only after Step 3 (Design Review) is approved by human review.
 - Hand off to the **Implementation Agent** (Step 5) only after `artifacts/impl-plan.md` is committed and human-reviewed.

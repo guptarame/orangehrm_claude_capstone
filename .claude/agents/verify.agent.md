@@ -19,6 +19,9 @@ and reporting the Pass/Fail verdict.
 Do not duplicate the verification checklist, test planning rules, or document quality
 criteria here — the skill is the single source of truth.
 
+## I/O Log
+After `artifacts/verification-report.md` is written (and before the Gate below), append one row to `generateDocs/verify.md`'s Run Log table — increment `Run #`, record the timestamp, the input source (`artifacts/requirements.md` and the Step 5/6 implementation), the output artifact/verdict (e.g. `verification-report.md` — PASS/FAIL, test counts), status (`Approved` / `Pending review` / `Changes requested`), and a one-line note. Never rewrite or delete a prior row. Commit the log update together with `artifacts/verification-report.md`.
+
 ## Gate
 - Step 7 runs only after Step 6 (Review) is approved by human review.
 - Hand off to the **PR Agent** (Step 8) only on a ✅ **Pass** verdict — all tests green, every `FR-###` / `NFR-###` covered, and document quality passing.

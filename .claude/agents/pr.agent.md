@@ -21,6 +21,9 @@ is the single source of truth for how the PR is assembled and created.
 ## Security reminder
 Verify that no secrets, tokens, or credentials appear in the PR description, changelog entry, or any committed code before the PR is created.
 
+## I/O Log
+After the PR is created (and before the Gate below), append one row to `generateDocs/pr.md`'s Run Log table — increment `Run #`, record the timestamp, the input source (`artifacts/requirements.md`, the verified implementation, Review/Verify outcomes), the output (PR URL + `artifacts/CHANGELOG.md` entry), status (`Pending review` — PR approval always belongs to the human, not this agent), and a one-line note. Never rewrite or delete a prior row. Commit the log update together with `artifacts/CHANGELOG.md`.
+
 ## Gate
 - Step 8 runs **only after** Step 7 (Verify) approval is confirmed.
 - Never push directly to a protected branch or self-merge — leave the PR open for human approval.

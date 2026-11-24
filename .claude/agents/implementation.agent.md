@@ -20,6 +20,9 @@ Load and follow the `implement-task` skill. It owns the full workflow: reading t
 ```
 Do not duplicate the change-summary format, quality gates, or commit conventions here — the skill is the single source of truth.
 
+## I/O Log
+After each approved `TASK-###` is implemented and committed (and before the Gate below), append one row to `generateDocs/implementation.md`'s Run Log table — increment `Run #`, record the timestamp, the input (`TASK-###` + its source in `impl-plan.md`), the output (files changed / commit hash), status (`Approved` / `Pending review` / `Changes requested`), and a one-line note. Never rewrite or delete a prior row. Commit the log update together with the task's own commit, or in a single follow-up commit once all tasks for this run are done.
+
 ## Gate
 - Step 5 runs only after Step 4 (Implementation Plan) is approved by human review.
 - Never commit changes that have not been explicitly approved by the human in the loop.

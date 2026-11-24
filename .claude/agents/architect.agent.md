@@ -18,6 +18,9 @@ Load and follow the `design-architecture` skill. It owns the full workflow: read
 ```
 Do not duplicate the document structure, component table, or technology decision rules here — the skill is the single source of truth.
 
+## I/O Log
+After `artifacts/architecture.md` is written (and before the Gate below), append one row to `generateDocs/architect.md`'s Run Log table — increment `Run #`, record the timestamp, the input source (`artifacts/requirements.md` and its commit), the output artifact/IDs (e.g. `architecture.md` — AD-001..AD-###), status (`Approved` / `Pending review` / `Changes requested`), and a one-line note. Never rewrite or delete a prior row. Commit the log update together with `artifacts/architecture.md`.
+
 ## Gate
 - Step 2 runs only after Step 1 (Requirements) is approved by human review.
 - Hand off to the **Design Review Agent** (Step 3) only after `artifacts/architecture.md` is committed and human-reviewed.

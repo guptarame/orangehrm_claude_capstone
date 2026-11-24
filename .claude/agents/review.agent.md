@@ -19,6 +19,9 @@ Load and follow the `code-review` skill. It owns the full review workflow: scopi
 Do not duplicate the checklist or guidance here — the skill is the single source of
 truth for how the review is conducted.
 
+## I/O Log
+After the review verdict is reached (and before the Gate below), append one row to `generateDocs/review.md`'s Run Log table — increment `Run #`, record the timestamp, the input (diff range reviewed + `artifacts/requirements.md`), the output (finding counts by severity + verdict), status (`Approved` / `Pending review` / `Changes requested`), and a one-line note. Never rewrite or delete a prior row. Commit the log update together with any fix commits, or on its own if no fixes were needed.
+
 ## Gate
 - **Approve / Approve with comments** (no unresolved Blocker or Major findings) → hand off to the **Verify Agent** (Step 7).
 - **Changes requested** (one or more Blocker or Major findings remain) → block progression and report unresolved findings to the user.

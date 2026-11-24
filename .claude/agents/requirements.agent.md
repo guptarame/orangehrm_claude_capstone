@@ -18,6 +18,9 @@ Load and follow the `write-requirements` skill. It owns the full workflow: inges
 Do not duplicate the document structure, FR rules, or acceptance-criteria format here
 — the skill file is the single source of truth.
 
+## I/O Log
+After `artifacts/requirements.md` is written (and before the Gate below), append one row to `generateDocs/requirements.md`'s Run Log table — increment `Run #`, record the timestamp, the input source (Confluence PRD id or `userstory.md`), the output artifact/IDs (e.g. `requirements.md` — FR-001/AC-001), status (`Approved` / `Pending review` / `Changes requested`), and a one-line note. Never rewrite or delete a prior row. Commit the log update together with `artifacts/requirements.md`.
+
 ## Gate
 - Step 1 is the pipeline entry point — no prior gate.
 - Hand off to the **Architect Agent** (Step 2) only after `artifacts/requirements.md` is committed and human-reviewed.

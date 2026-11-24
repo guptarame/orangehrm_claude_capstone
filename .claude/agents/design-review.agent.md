@@ -18,6 +18,9 @@ Load and follow the `design-review` skill. It owns the full workflow: reading th
 Do not duplicate the review checklist, severity definitions, or document structure
 here — the skill is the single source of truth.
 
+## I/O Log
+After `artifacts/design-review.md` is written (and before the Gate below), append one row to `generateDocs/design-review.md`'s Run Log table — increment `Run #`, record the timestamp, the input source (`artifacts/architecture.md` and its commit), the output artifact/IDs (e.g. `design-review.md` — DR-001..DR-###, severity counts), status (`Approved` / `Pending review` / `Changes requested`), and a one-line note. Never rewrite or delete a prior row. Commit the log update together with `artifacts/design-review.md`.
+
 ## Gate
 - Step 3 runs only after Step 2 (Architecture) is approved by human review.
 - Hand off to the **Planner Agent** (Step 4) only when no unresolved **Critical** or **High** findings remain and `artifacts/design-review.md` is committed.
