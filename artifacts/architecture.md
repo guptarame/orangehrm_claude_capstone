@@ -3,64 +3,67 @@
 ## Overview
 
 This repository is a **Selenium + Java + Cucumber BDD test automation framework**
-(Maven, JUnit 4, Page Object Model) that verifies the already-live, externally hosted
+(Maven, JUnit 4, Page Object Model) that drives the already-live, externally hosted
 OrangeHRM demo application. There is no application-under-test source in this
-repository, so "architecture" here means the layering of the *test* system — feature
-specification, step glue, Page Objects, and driver/config infrastructure — and how
-those layers realize the verification of `FR-001` (`AC-001`).
-
-The architecture described below is **already implemented**. This document records and
-validates it for the Design Review, Planner, Implementation, and Verify agents; it is
-not a proposal for greenfield construction. Where the existing code could not be
-reconciled with `artifacts/requirements.md`, the discrepancy is raised in
-[Open Questions](#open-questions) rather than resolved by assumption. Each of those
-questions has since been ruled on by the Design Review Agent (Step 3) — see
-`artifacts/design-review.md` for the findings (`DR-018`+) and agreed decisions.
+repository — "architecture" here means the layering of the *test* framework
+(feature specification, step glue, Page Objects, driver/config infrastructure) that
+will realize verification of `FR-001` (`AC-001`). This document is a **design
+proposal for Step 5 (Implementation)**, not a record of existing code: on this
+branch, no `pom.xml` or `src/` tree is present yet (confirmed via `git ls-files`), so
+every component below is to be built, not already built. Where `.claude/CLAUDE.md`
+already mandates a project convention (directory layout, class names, config
+precedence), this document adopts it as a constraint rather than re-deriving it from
+scratch.
 
 ## Architectural Goals and Drivers
 
 | Driver | Source | Architectural consequence |
 | --- | --- | --- |
-| `FR-001` — login page displays all required controls (logo/branding, Username field, Password field, Login button, forgot-password link, footer copyright + social links) | `artifacts/requirements.md` § FR-001 | A single Page Object (`LoginPage`) owns all seven control locators; the step layer owns only assertions. Realized by scenario `@TS_LOG_008`. |
-| `AC-001` — all controls **visible** after the page finishes loading | `artifacts/requirements.md` § AC-001 | Presence is insufficient: all checks use Selenium `visibilityOfElementLocated`, not `presenceOfElementLocated`. Page-load completion is established by `LoginPage.open()` waiting for the Username field before any control check runs. |
-| Diagnosability of an `FR-001` failure | Derived from `AC-001` (six named controls in one criterion) | Controls are evaluated **independently** and the missing ones are collected into a list (`findMissingLoginControls()`), rather than short-circuiting one boolean — so the report names which control was absent. |
-| Deterministic synchronization | `.claude/rules/tests.md` (determinism) | Explicit waits only; **no implicit wait** is configured anywhere, so a legitimate "not displayed" outcome does not pay a hidden implicit-wait cost. |
-| `NFR-002` — HTTPS transport | `artifacts/requirements.md` § Out of Scope (tracked separately as `NFR-002`; **out of scope for `FR-001`**) | Already realized in code at two layers (`ConfigReader.getBaseUrl()` preventive guard, `LoginSteps` executed post-navigation scheme assertion). Documented here only to map existing code, not as an `FR-001` driver. See [Security Considerations](#security-considerations). |
-| Out-of-scope behaviours (password masking, success/failure flows, forgot-password navigation) | `artifacts/requirements.md` § Out of Scope | Their Page Objects (`DashboardPage`, `ResetPasswordPage`) and locators already exist and remain in the architecture, but carry **no** `FR-001` trace. They are listed as supporting components with FR/NFR = `n/a (out of scope)`. |
+| `FR-001` — login page displays all required controls (logo/branding, Username field, Password field, Login button, "Forgot your password?" link, footer with copyright + social links) | `artifacts/requirements.md` § FR-001 | A single Page Object (`LoginPage`) owns all six control locators; the step layer owns only assertions (`AD-002`). |
+| `AC-001` — all controls **visible** after the page finishes loading | `artifacts/requirements.md` § AC-001 | Presence is insufficient: all checks must use Selenium `visibilityOfElementLocated`, not `presenceOfElementLocated`. Page-load completion is established by waiting for the Username field before any control check runs (`AD-003`). |
+| Diagnosability of an `FR-001` failure (six named controls in one criterion) | Derived from `AC-001` | Controls are evaluated **independently**; missing ones are collected into one list rather than short-circuiting on the first failure, so the failure message names every missing control (`AD-006`). |
+| Deterministic synchronization | `.claude/rules/tests.md` (determinism) | Explicit waits only; **no implicit wait**, so a legitimate "not displayed" outcome does not pay a hidden implicit-wait cost (`AD-003`). |
+| Mandated project structure and conventions (Page Object Model, no Selenium calls in step defs, `ConfigReader`/`DriverManager`/`Hooks` names and responsibilities) | `.claude/CLAUDE.md` § Application architecture / Key conventions | Adopted as binding constraints, not re-derived (`AD-001`, `AD-002`, `AD-004`, `AD-005`). |
+| HTTPS transport guard referenced as `NFR-002` | `.claude/CLAUDE.md` § Configuration (`getBaseUrl()` fails closed unless scheme is `https`) | Adopted as a `ConfigReader` design constraint (`AD-004`) because it is an existing, binding project convention. **Not** claimed as satisfying an approved non-functional requirement: `artifacts/requirements.md` names `NFR-002` only once, inside § Out of Scope, as a pointer to work "tracked separately" — no `NFR-002` statement, measurable target, or acceptance criterion exists in any approved artifact, and no `NFR-001` exists either. See [Open Questions](#open-questions). |
+| Reporting that lets Step 7 (Verify) and a human triage an `FR-001` failure without re-running | Derived from the pipeline's gated, artifact-driven workflow (`.claude/CLAUDE.md` § Agentic SDLC pipeline) | Multi-format Cucumber reports plus failure screenshots (`AD-007`). |
 
 ## Recommended Architecture
 
-A four-layer, one-way-dependency test architecture. Each layer may call only the layer
-below it, which is what keeps `FR-001`'s verification expressible in one Gherkin
-scenario and one Page Object method.
+A four-layer, one-way-dependency test architecture, matching `.claude/CLAUDE.md`'s
+mandated structure. Each layer may call only the layer below it, which keeps
+`FR-001`'s verification expressible in one Gherkin scenario and one Page Object
+method.
 
-1. **Specification layer** — `login.feature`. Gherkin scenarios tagged `@TS_LOG_###`;
-   the business-readable statement of `AC-001` lives here (`@TS_LOG_008`).
-2. **Glue layer** — `LoginSteps` (step bindings) and `Hooks` (per-scenario lifecycle).
-   Contains assertions and orchestration only; **zero** Selenium API calls, per the
-   project convention in `.claude/CLAUDE.md`.
-3. **Page Object layer** — `BasePage` + `LoginPage` / `DashboardPage` /
-   `ResetPasswordPage`. Sole owner of locators, waits, and page interactions. All
-   `FR-001` DOM knowledge is confined to `LoginPage`.
+1. **Specification layer** — `login.feature`. Gherkin scenarios tagged
+   `@TS_LOG_###`; the business-readable statement of `AC-001` lives here as the
+   first scenario, `@TS_LOG_001`.
+2. **Glue layer** — `LoginSteps` (step bindings) and `Hooks` (per-scenario
+   lifecycle). Contains assertions and orchestration only; **zero** Selenium API
+   calls, per `.claude/CLAUDE.md`.
+3. **Page Object layer** — `BasePage` + `LoginPage` (and, as placeholders for
+   already-anticipated, explicitly out-of-scope follow-on stories named in
+   `.claude/CLAUDE.md`, `DashboardPage` / `ResetPasswordPage`). Sole owner of
+   locators, waits, and page interactions. All `FR-001` DOM knowledge is confined
+   to `LoginPage`.
 4. **Infrastructure layer** — `ConfigReader` (configuration + security guards),
    `DriverManager` (browser lifecycle), `config.properties`. Shared by all pages.
 
-The **system under test is external and read-only** to this repository: the framework
-never deploys, seeds, or mutates OrangeHRM. For `FR-001` the interaction is purely
-observational (navigate, read visibility and placeholder attributes), which is why
-`@TS_LOG_008` requires no credentials and no state cleanup.
+The **system under test is external and read-only** to this repository: the
+framework never deploys, seeds, or mutates OrangeHRM. For `FR-001` the interaction
+is purely observational (navigate, read visibility and placeholder attributes),
+so `@TS_LOG_001` needs no credentials and no state cleanup.
 
 ## Component Diagram
 
 ```mermaid
 graph TD
     subgraph BUILD["Build and execution"]
-        MVN["Maven + Surefire 3.5.2<br/>pom.xml (JDK 11)"]
+        MVN["Maven + Surefire<br/>pom.xml (JDK 11+) - to be added, Step 5"]
         RUN["TestRunner<br/>JUnit 4 + Cucumber entry point"]
     end
 
     subgraph SPEC["1. Specification layer"]
-        FEAT["features/login.feature<br/>@TS_LOG_008 realizes FR-001"]
+        FEAT["features/login.feature<br/>@TS_LOG_001 realizes FR-001"]
     end
 
     subgraph GLUE["2. Glue layer"]
@@ -71,8 +74,8 @@ graph TD
     subgraph PAGES["3. Page Object layer"]
         BASE["BasePage<br/>explicit-wait helpers"]
         LOGIN["LoginPage<br/>FR-001 locators + readers"]
-        DASH["DashboardPage<br/>out of scope"]
-        RESET["ResetPasswordPage<br/>out of scope"]
+        DASH["DashboardPage<br/>out of scope - future story"]
+        RESET["ResetPasswordPage<br/>out of scope - future story"]
     end
 
     subgraph INFRA["4. Infrastructure layer"]
@@ -114,34 +117,32 @@ graph TD
     class DASH,RESET oos
 ```
 
-Blue = components carrying an `FR-001` trace. Grey = components present in the
-framework but outside `FR-001`'s scope.
+Blue = components that will carry an `FR-001` trace. Grey = components named by
+`.claude/CLAUDE.md`'s target structure but outside `FR-001`'s scope (future
+stories: AC2 successful login, AC4 password-recovery navigation).
 
 ## Key Components and Responsibilities
 
 | Component | Responsibility | FR/NFR |
 | --- | --- | --- |
-| `src/test/resources/features/login.feature` (`@TS_LOG_008`) | Business-readable specification of `AC-001`: asserts all required controls displayed plus both placeholder values. Carries an inline `# FR-001` trace comment. | `FR-001` (`AC-001`) |
-| `stepdefinitions/LoginSteps.all_required_login_controls_should_be_displayed()` | Fails the scenario when `findMissingLoginControls()` returns a non-empty list, embedding the missing control names in the assertion message. Tagged `// FR-001`. | `FR-001` |
-| `stepdefinitions/LoginSteps.the_username_field_placeholder_should_be()` | Asserts the Username field's `placeholder` equals the expected value (`"Username"`). Tagged `// FR-001`. | `FR-001` |
-| `stepdefinitions/LoginSteps.the_password_field_placeholder_should_be()` | Asserts the Password field's `placeholder` equals the expected value (`"Password"`). Tagged `// FR-001`. | `FR-001` |
-| `pages/LoginPage.findMissingLoginControls()` | Evaluates the seven required controls independently (logo, username field, password field, Login button, forgot-password link, footer copyright, footer social link) and returns the names of those not visible. Single owner of `FR-001` locators. | `FR-001` |
-| `pages/LoginPage.getUsernamePlaceholder()` / `getPasswordPlaceholder()` | Read the `placeholder` DOM attribute for the step layer to compare (no assertion in the page class). | `FR-001` |
-| `pages/LoginPage.open(baseUrl)` | Navigates to `base.url` and waits for the Username field, establishing `AC-001`'s "page finishes loading" precondition before any control check. Bound to the `Background` step. | `FR-001` (`AC-001`) |
-| `pages/BasePage` | Shared explicit-wait helpers (`waitForVisible`, `isDisplayed(locator, timeout)`, `isPresent`, `type`, `click`, `getText`). `isDisplayed` converts a `TimeoutException` into a first-class `false`, which is what makes "not displayed" a reportable outcome rather than an error. | `FR-001` (supporting) |
-| `config/ConfigReader` | Thread-safe singleton; resolves every key with `-D` → environment variable → `config.properties` precedence. Supplies `base.url`, `explicit.wait`, `page.load.timeout`, `browser`, `headless`. | `FR-001` (supplies target URL and timeouts); `NFR-002` (HTTPS fail-closed guard in `getBaseUrl()`) |
-| `driver/DriverManager` | Creates and disposes the browser session per thread via `ThreadLocal<WebDriver>`; applies the page-load timeout and deliberately applies **no implicit wait**; quits a partially initialised browser on configuration failure. | `FR-001` (supporting) |
-| `hooks/Hooks` | `@Before` launches the driver before the first step; `@After` attaches a failure screenshot (best-effort, never masking the original failure) and always quits the driver. Guarantees a fresh, isolated session per scenario. | `FR-001` (diagnostics and isolation) |
-| `runner/TestRunner` | JUnit 4 + Cucumber entry point; discovers `src/test/resources/features`, binds glue packages, emits pretty/HTML/JSON/JUnit-XML reports to `target/cucumber-reports/`. | `FR-001` (execution and reporting) |
-| `src/test/resources/config.properties` | Declares the environment: `base.url` (the `.../auth/login` URL named in `AC-001`), `browser`, `headless`, `explicit.wait=15`, `page.load.timeout=30`, demo credentials. | `FR-001`; `NFR-002` |
-| `config/ConfigReaderTest` | The only unit-test class. Covers `ConfigReader`'s security guards (HTTPS fail-closed, opt-out warning latch, demo-password host restriction) with system-property save/restore. | `NFR-002` (not `FR-001`) |
-| `pages/DashboardPage` | Post-login landing-page assertions (URL fragment, header, user dropdown). | n/a — out of scope (AC2) |
-| `pages/ResetPasswordPage` | Password-reset-request page assertions. | n/a — out of scope (AC4) |
-| `pages/LoginPage` error/validation/loading/password-type readers | Support the out-of-scope negative, validation, masking, and loading-indicator scenarios. | n/a — out of scope (AC1.2, AC3, loading indicator) |
+| `src/test/resources/features/login.feature` (`@TS_LOG_001`) | Business-readable specification of `AC-001`: asserts all six required controls are displayed plus both placeholder values. Carries an inline `# FR-001` trace comment. (`AD-001`, `AD-006`) | `FR-001` (`AC-001`) |
+| `stepdefinitions.LoginSteps` — "all required login controls should be displayed" step | Fails the scenario when the Page Object's missing-controls check returns a non-empty list, embedding the missing control names in the assertion message. Tagged `// FR-001`. (`AD-002`, `AD-006`) | `FR-001` |
+| `stepdefinitions.LoginSteps` — Username/Password placeholder steps | Assert the Username field's placeholder equals `"Username"` and the Password field's placeholder equals `"Password"`. Tagged `// FR-001`. (`AD-002`) | `FR-001` |
+| `pages.LoginPage` — missing-controls check | Evaluates all six required controls (logo, username field, password field, Login button, forgot-password link, footer copyright + social links) independently and returns the names of those not visible. Sole owner of `FR-001` locators. (`AD-002`, `AD-006`) | `FR-001` |
+| `pages.LoginPage` — placeholder readers | Read the `placeholder` DOM attribute for the step layer to compare; no assertion lives in the page class. (`AD-002`) | `FR-001` |
+| `pages.LoginPage.open(baseUrl)` | Navigates to `base.url` and waits for the Username field, establishing `AC-001`'s "page finishes loading" precondition before any control check runs. Bound to the `Background` step. (`AD-003`) | `FR-001` (`AC-001`) |
+| `pages.BasePage` | Shared explicit-wait helpers (visibility checks that convert a `TimeoutException` into a first-class `false`, so "not displayed" is a reportable outcome rather than a thrown error). (`AD-003`) | `FR-001` (supporting) |
+| `config.ConfigReader` | Thread-safe singleton; resolves every key with `-D` → environment variable → `config.properties` precedence. Supplies `base.url`, `explicit.wait`, `page.load.timeout`, `browser`, `headless`. Fails closed on a non-`https` `base.url` (HTTPS guard adopted from `.claude/CLAUDE.md`; see [Open Questions](#open-questions) on `NFR-002`'s undefined status). (`AD-004`) | `FR-001` (supplies target URL and timeouts); HTTPS guard referenced as `NFR-002` by convention, **not** by an approved requirement |
+| `driver.DriverManager` | Creates and disposes the browser session per thread via `ThreadLocal<WebDriver>`; applies the page-load timeout; deliberately applies **no** implicit wait. (`AD-005`) | `FR-001` (supporting) |
+| `hooks.Hooks` | `@Before` launches the driver before the first step; `@After` attaches a failure screenshot (best-effort, never masking the original failure) and always quits the driver. Guarantees a fresh, isolated session per scenario. (`AD-005`, `AD-007`) | `FR-001` (diagnostics and isolation) |
+| `runner.TestRunner` | JUnit 4 + Cucumber entry point; discovers `src/test/resources/features`, binds glue packages, emits pretty/HTML/JSON/JUnit-XML reports. (`AD-001`, `AD-007`) | `FR-001` (execution and reporting) |
+| `src/test/resources/config.properties` | Declares the environment: `base.url` (the `.../auth/login` URL named in `AC-001`), `browser`, `headless`, `explicit.wait`, `page.load.timeout`. (`AD-004`) | `FR-001` |
+| `pages.DashboardPage`, `pages.ResetPasswordPage` | Placeholders for the already-named future stories (AC2 successful login, AC4 password-recovery navigation) per `.claude/CLAUDE.md`'s target structure. Not required to implement `FR-001`. | n/a — out of scope |
 
 ## Data Flow
 
-`FR-001` / `AC-001` end-to-end, as currently implemented by `@TS_LOG_008`:
+Proposed `FR-001` / `AC-001` end-to-end flow, to be realized by scenario
+`@TS_LOG_001` in Step 5:
 
 ```mermaid
 sequenceDiagram
@@ -157,7 +158,7 @@ sequenceDiagram
     participant SUT as OrangeHRM demo site
 
     MVN->>RUN: run TestRunner (optional tag filter)
-    RUN->>HK: @Before (scenario @TS_LOG_008)
+    RUN->>HK: @Before (scenario @TS_LOG_001)
     HK->>DRV: getDriver()
     DRV->>CFG: browser, headless, page.load.timeout
     DRV->>BR: launch session (no implicit wait)
@@ -165,7 +166,7 @@ sequenceDiagram
     Note over ST,SUT: Background - Given the user is on the login page
     RUN->>ST: Given step
     ST->>CFG: getBaseUrl()
-    CFG-->>ST: https base.url (fails closed if not https - NFR-002)
+    CFG-->>ST: https base.url (fails closed if not https)
     ST->>LP: open(baseUrl)
     LP->>BR: navigate
     BR->>SUT: GET /web/index.php/auth/login over HTTPS
@@ -175,7 +176,7 @@ sequenceDiagram
     Note over ST,BR: Then all required login controls should be displayed - FR-001
     RUN->>ST: Then step (FR-001)
     ST->>LP: findMissingLoginControls()
-    loop each of 7 controls, independently, 3s visibility wait
+    loop each of 6 controls, independently, short visibility wait
         LP->>BR: visibilityOfElementLocated(locator)
         BR-->>LP: visible / timeout to false
     end
@@ -196,21 +197,22 @@ sequenceDiagram
 
 ## Technology Choices
 
-All choices below are **pre-existing and confirmed in the repository**, not new
-proposals. Versions are from `pom.xml`.
+No `pom.xml` exists on this branch yet (`Not Found`), so the choices below are
+**recommendations for Step 5**, not confirmed repository facts. They follow
+`.claude/CLAUDE.md`'s mandated stack and the "JDK 11+ and Maven" constraint.
 
 | Decision | Choice | Rationale | Trade-offs |
 | --- | --- | --- | --- |
-| Browser automation | Selenium WebDriver 4.27.0 (`selenium-java`) | W3C-standard, cross-browser; the only way to assert *rendered visibility* of DOM controls as `AC-001` requires. | Slower and more environment-sensitive than API-level checks; `FR-001` genuinely needs a real renderer, so this is accepted. |
-| Specification format | Cucumber JVM 7.20.1 (`cucumber-java`, `cucumber-junit`) | Gherkin keeps `AC-001` expressible almost verbatim as `@TS_LOG_008`, preserving requirement-to-test traceability for the pipeline. | Extra glue-maintenance layer; step-text drift can silently unbind a step. |
-| Test runner | JUnit 4.13.2 via `@RunWith(Cucumber.class)` | Matches the existing suite and Surefire integration; `-Dcucumber.filter.tags` gives single-scenario runs. | JUnit 4 + `cucumber-junit` has **no parallel execution support**, so `DriverManager`'s thread safety is latent rather than exercised (see Scalability). |
-| Design pattern | Page Object Model with an abstract `BasePage` | Confines all `FR-001` DOM/locator knowledge to `LoginPage`; a demo-site markup change is a one-file fix. | Indirection; risk of page classes accumulating unrelated readers (already visible in `LoginPage`, which also serves out-of-scope scenarios). |
-| Synchronization | Explicit waits only (`WebDriverWait` in `BasePage`); no implicit wait | Deterministic, and makes a "not displayed" result cost exactly its own timeout instead of an invisible global one — essential for `FR-001`'s per-control checks. | Every new locator must choose a timeout deliberately; no global safety net. |
-| Driver binaries | WebDriverManager 5.9.2 | Resolves and caches matching driver binaries automatically; no committed binaries, no manual PATH setup. | Needs network access on a cold cache; auto-resolution can surprise after a browser auto-update. |
-| Configuration | `ConfigReader` singleton over `config.properties` with `-D` → env → file precedence | One mechanism covers local runs and CI secret injection with no code change; centralises the `NFR-002` HTTPS guard at the single point where `base.url` is read. | Global singleton state is shared across the Surefire JVM, which `ConfigReaderTest` must explicitly save/restore. |
-| Build | Maven + Surefire 3.5.2, JDK 11 target | Standard, zero-install-step dependency resolution; Surefire `includes` deliberately narrowed to `**/TestRunner.java` and `**/*Test.java`. | JDK 11 forgoes newer language features. |
-| Logging | SLF4J 2.0.16 + `slf4j-simple` | Minimal console diagnostics in `DriverManager`, `Hooks`, `ConfigReader` (including the `NFR-002` opt-out warning). | `slf4j-simple` offers no file appenders, routing, or log levels per package. |
-| Reporting | Cucumber `pretty`, `summary`, HTML, JSON, JUnit-XML to `target/cucumber-reports/` + `Hooks` failure screenshots | JSON/XML are machine-readable for the Verify agent (Step 7); the screenshot plus the missing-control list makes an `FR-001` failure diagnosable without a re-run. | Reports are build-local artifacts; no history or trend retention. |
+| `AD-001` Browser automation + specification stack | Selenium WebDriver (4.x) + Cucumber-JVM (7.x, `cucumber-java`/`cucumber-junit`) + JUnit 4, built with Maven | Selenium is the only way to assert *rendered visibility* of DOM controls as `AC-001` requires; Cucumber keeps `AC-001` expressible almost verbatim as a Gherkin scenario, preserving requirement-to-test traceability. | Selenium is slower and more environment-sensitive than API-level checks, but `FR-001` genuinely needs a real renderer. Cucumber adds a glue-maintenance layer; step-text drift can silently unbind a step. |
+| `AD-002` Design pattern | Page Object Model with an abstract `BasePage`; zero Selenium calls in step definitions | Confines all `FR-001` DOM/locator knowledge to `LoginPage`; a demo-site markup change is a one-file fix. Matches `.claude/CLAUDE.md`'s "Which file to extend" convention. | Indirection; risk of page classes accumulating unrelated readers as later stories are added. |
+| `AD-003` Synchronization | Explicit waits only (`WebDriverWait` in `BasePage`); no implicit wait configured anywhere | Deterministic, and makes a "not displayed" result cost exactly its own timeout instead of an invisible global one — essential for `FR-001`'s per-control checks. | Every new locator must choose a timeout deliberately; no global safety net. |
+| `AD-004` Configuration | `ConfigReader` singleton over `config.properties` with `-D` → env → file precedence; HTTPS fail-closed guard on `base.url` | One mechanism covers local runs and CI secret injection with no code change; centralizes the HTTPS guard mandated by `.claude/CLAUDE.md` at the single point where `base.url` is read. | Global singleton state would need explicit save/restore in any unit test that mutates system properties. The HTTPS guard is adopted as a convention, not as proof of an approved `NFR-002` (see Open Questions). |
+| `AD-005` Driver lifecycle | `DriverManager` with `ThreadLocal<WebDriver>`, created/torn down per scenario by `Hooks` | Thread-safe by construction, preparing for parallel execution later without a redesign; per-scenario isolation means no leftover form state can hide a defect. | Parallel execution is not automatically exercised by the JUnit 4 + `cucumber-junit` runner (see Scalability); per-scenario browser launch dominates runtime. |
+| `AD-006` Failure reporting strategy | Evaluate all `FR-001` controls independently per scenario run; collect missing-control names into one assertion rather than short-circuiting | Makes an `FR-001` failure diagnosable without a re-run — the message names exactly which control is absent. | Worst case (all controls missing) costs the sum of each control's own short timeout rather than one timeout. |
+| `AD-007` Reporting and diagnostics | Cucumber `pretty`/`summary` console + HTML/JSON/JUnit-XML reports; `Hooks` attaches a failure screenshot | JSON/XML are machine-readable for the Verify agent (Step 7); the screenshot plus the missing-control list makes an `FR-001` failure diagnosable without a re-run. | Reports are build-local artifacts; no history or trend retention. |
+| Driver binaries | WebDriverManager (5.x) | Resolves and caches matching driver binaries automatically; no committed binaries, no manual PATH setup. | Needs network access on a cold cache; auto-resolution can surprise after a browser auto-update. |
+| Logging | SLF4J + a simple binding | Minimal console diagnostics in `DriverManager`, `Hooks`, `ConfigReader`. | A simple binding offers no file appenders, routing, or per-package log levels; acceptable for a demo-scale suite. |
+| Build | Maven + Surefire, JDK 11 target | Matches `.claude/CLAUDE.md`'s stated setup (`mvn clean install -DskipTests`, `mvn test`); Surefire should be scoped to `**/TestRunner.java` and `**/*Test.java` only, per convention. | JDK 11 forgoes newer language features. |
 
 ## SDLC Pipeline Components
 
@@ -220,255 +222,198 @@ proposals. Versions are from `pom.xml`.
 | Agent | `.claude/agents/architect.agent.md` (Step 2) | Owns this document; thin invoker that delegates to `design-architecture`. |
 | Agent | `.claude/agents/design-review.agent.md` (Step 3) | Next gate; reviews this document and raises `DR-###` findings. |
 | Agent | `.claude/agents/planner.agent.md` (Step 4) | Turns this architecture + `FR-001` into `TASK-###` items in `artifacts/impl-plan.md`. |
-| Agent | `.claude/agents/implementation.agent.md` (Step 5) | Applies approved tasks to `src/`; gated by the pre-implementation hook. |
+| Agent | `.claude/agents/implementation.agent.md` (Step 5) | Builds `src/` (currently absent on this branch) from approved tasks; gated by `.claude/hooks/pre_implementation.md`. |
 | Agent | `.claude/agents/review.agent.md` (Step 6) | Code review against `.claude/rules/code-quality.md` and `tests.md`. |
 | Agent | `.claude/agents/verify.agent.md` (Step 7) | Executes the suite and writes `artifacts/verification-report.md`. |
 | Agent | `.claude/agents/pr.agent.md` (Step 8) | Opens the PR and writes `artifacts/CHANGELOG.md`. |
 | Skill | `design-architecture` | Owns this document's workflow and exact structure (source of truth for Step 2). |
-| Skill | `sdlc-traceability` | `FR-###` / `NFR-###` / `DR-###` / `TASK-###` ID conventions and the chain enforced throughout this document. |
+| Skill | `sdlc-traceability` | `FR-###` / `NFR-###` / `AD-###` / `DR-###` / `TASK-###` ID conventions and the chain enforced throughout this document. |
 | Skill | `write-requirements`, `read-user-story` | Upstream (Step 1) inputs. |
 | Skill | `design-review`, `plan-implementation`, `implement-task`, `code-review`, `verify-implementation`, `create-pr` | Downstream steps 3-8. |
 | Rule | `.claude/rules/sdlc-artifacts.md` | Auto-applied to `artifacts/**/*.md`: stable IDs, Mermaid diagrams, `Not Found` over invention, confirmed-vs-assumed separation. Governs this file. |
-| Rule | `.claude/rules/code-quality.md` | Auto-applied to `**/*.java` / `**/*.feature`: OWASP-safe, DRY, scope discipline. |
+| Rule | `.claude/rules/code-quality.md` | Auto-applied to `**/*.java` / `**/*.feature`: OWASP-safe, DRY, scope discipline; explicit HTTPS/masking/generic-error guidance for the login use case. |
 | Rule | `.claude/rules/tests.md` | Auto-applied to test sources: coverage from acceptance criteria, requirement IDs in test names/comments, determinism. |
 | Hook | `.claude/hooks/pre_implementation.md` | Step 5 pre-flight gate: upstream artifacts exist and are approved, task is unblocked and requirement-backed, clean `git status` and build, `base.url` targets the intended host, no new hard-coded secret. |
-| Command | `.claude/commands/orchestrator.prompt.md` | Pipeline entry point; drives the 8 steps and the human review gate per step. |
+| Command | pipeline entry point (`/orchestrator.prompt`) | Drives the 8 steps and the human review gate per step. |
 | State | `artifacts/ORCHESTRATION_LOG.md` | Per-step status, artifact, timestamps, and notes. |
-| MCP server | `confluence` (`.mcp.json`, `mcp-atlassian`, stdio) | Source of the PRD (Confluence page 13271042) behind `FR-001`. Credentials come from `CONFLUENCE_*` environment variables, never committed. |
-| MCP server | `github` (`.mcp.json`, HTTP) | PR/issue operations for Step 8; bearer token from `GITHUB_PERSONAL_ACCESS_TOKEN` environment variable. |
 
 ## Security Considerations
 
-The framework holds no end-user data and exposes no attack surface of its own; its
-security posture concerns **credential handling, transport, and target confinement**.
+The framework will hold no end-user data and exposes no attack surface of its own;
+its security posture concerns **credential handling, transport, and target
+confinement**.
 
-- **Transport (`NFR-002`, out of scope for `FR-001` but already implemented).** Two
-  independent layers, by design:
-  - *Preventive* — `ConfigReader.getBaseUrl()` parses `base.url` and throws
-    `IllegalStateException` unless the **scheme** (not a substring) is `https`. This
-    runs before the browser ever navigates, so it can actually prevent a cleartext
-    submission. The sole opt-out is `allow.insecure.base.url=true`, documented for a
-    local non-TLS sandbox only, left commented out in `config.properties`, and
-    emitting a one-time `WARN` (key name only, never the `base.url` value) so a
-    bypass is detectable after the fact.
-  - *Executed* — the `the_current_page_should_be_served_over_https` step
-    re-checks the live URL's scheme. On `@TS_LOG_008` this runs pre-submission;
-    on `@TS_LOG_001` it necessarily runs after the password was already POSTed, so
-    it is defence-in-depth against a mid-session downgrade, not prevention. The code
-    comment states this limitation explicitly.
-- **Credentials.** `valid.username` / `valid.password` in `config.properties` are
-  OrangeHRM's **public demo values**, committed as a deliberate, scoped exception.
-  `ConfigReader.getValidPassword()` enforces the scope in code: off the
-  `opensource-demo.orangehrmlive.com` host it refuses the committed value and demands
-  `-Dvalid.password` or `VALID_PASSWORD`. `FR-001`/`@TS_LOG_008` needs **no**
-  credentials at all, so this risk is not on `FR-001`'s path.
-- **Secret hygiene.** No secret is logged. MCP credentials are environment-variable
-  placeholders in `.mcp.json`. The `-D` → env → file precedence means CI can inject
-  secrets with no code or file change.
-- **Authentication/authorisation of the framework itself.** Not applicable — the
+- **Transport.** The HTTPS fail-closed guard in `ConfigReader.getBaseUrl()`
+  (adopted from `.claude/CLAUDE.md`) is **preventive**: it should reject a
+  non-`https` `base.url` before the browser ever navigates, with a documented,
+  logged (never value-logging) opt-out for a local non-TLS sandbox only. This is a
+  project convention, not yet a defined, approved `NFR-002` — see
+  [Open Questions](#open-questions).
+- **Credentials.** Any demo credentials used by future (out-of-scope) scenarios
+  must be resolved through `ConfigReader`'s `-D` → env → file precedence, never
+  hard-coded in step definitions or logged. `FR-001`/`@TS_LOG_001` needs **no**
+  credentials at all, so this risk is not on `FR-001`'s path. Per
+  `.claude/rules/code-quality.md`, any future login-credential handling must mask
+  passwords, never transmit or store them in plain text outside the HTTPS request
+  itself, and keep any error message generic.
+- **Secret hygiene.** No secret should be logged at any layer. The `-D` → env →
+  file precedence means CI can inject secrets with no code or file change.
+- **Authentication/authorization of the framework itself.** Not applicable — the
   framework is a client; OrangeHRM owns authentication. Login-flow authentication
-  behaviour (AC2/AC3) is explicitly out of `FR-001`'s scope.
-- **Input validation.** All inputs are build-time configuration, not untrusted user
-  input. `ConfigReader` fails closed on a missing key (`RuntimeException`) and treats
-  a malformed or scheme-less URL as a guard failure rather than throwing from the URI
-  parser.
-- **Blast radius.** The target is a public demo instance and all `FR-001` interactions
-  are read-only (navigate + read attributes), so a failing run cannot corrupt state.
+  behavior (AC2/AC3) is explicitly out of `FR-001`'s scope.
+- **Input validation.** All inputs are build-time configuration, not untrusted
+  user input. `ConfigReader` should fail closed on a missing key and treat a
+  malformed or scheme-less URL as a guard failure.
+- **Blast radius.** The target is a public demo instance and all `FR-001`
+  interactions are read-only (navigate + read attributes), so a failing run
+  cannot corrupt state.
 
 ## Reliability and Observability
 
-- **Failure handling.** `BasePage.isDisplayed` catches `TimeoutException` and returns
-  `false`, making "not displayed" a reportable `FR-001` outcome instead of an
-  exception. `DriverManager.initDriver` quits a browser it started but had not yet
-  registered in the `ThreadLocal`, preventing orphaned processes.
-  `Hooks.tearDown` wraps screenshot capture in its own `try/catch` and quits the
-  driver in a `finally`, so neither a crashed session nor a screenshot failure can
-  mask the original scenario failure or leak a browser.
-- **Isolation.** Hooks run per scenario, not per suite: every scenario gets a fresh
-  browser session, so no leftover form state can hide a defect. `@TS_LOG_008` is
-  consequently order-independent.
-- **Retries.** There is **no** retry/rerun mechanism — deliberate for determinism
-  (`.claude/rules/tests.md`): a flaky `FR-001` failure stays visible rather than being
-  retried away. Recovery is to fix the locator or timeout, not to re-run.
-- **Timeouts.** Default explicit wait 15 s (`explicit.wait`), page load 30 s
-  (`page.load.timeout`), and a deliberately short 3 s per control in the `FR-001`
-  missing-controls group — valid because `open()` already confirmed the page loaded.
-- **Observability.** SLF4J console logging of scenario start/finish/status, browser
-  init, and the `NFR-002` opt-out warning; Cucumber `pretty`/`summary` console output;
-  HTML, JSON, and JUnit-XML reports under `target/cucumber-reports/`; PNG screenshots
-  attached to the scenario on failure. An `FR-001` failure message carries the exact
-  missing control names, so triage needs no re-run.
-- **Gap.** No log file, no aggregation, no run-history retention. There is no
-  "production" to monitor — the framework is run on demand.
+- **Failure handling.** `BasePage`'s visibility helper should catch
+  `TimeoutException` and return `false`, making "not displayed" a reportable
+  `FR-001` outcome instead of an exception. `DriverManager` should quit a browser
+  it started but had not yet registered, preventing orphaned processes.
+  `Hooks.tearDown` should wrap screenshot capture in its own `try/catch` and quit
+  the driver in a `finally`, so neither a crashed session nor a screenshot
+  failure can mask the original scenario failure or leak a browser.
+- **Isolation.** Hooks run per scenario, not per suite: every scenario gets a
+  fresh browser session, so no leftover form state can hide a defect.
+  `@TS_LOG_001` is consequently order-independent.
+- **Retries.** No retry/rerun mechanism — deliberate for determinism
+  (`.claude/rules/tests.md`): a flaky `FR-001` failure should stay visible rather
+  than be retried away.
+- **Timeouts.** Explicit wait and page-load timeout come from
+  `config.properties` (`explicit.wait`, `page.load.timeout`); each of the six
+  `FR-001` control checks uses its own short visibility wait, valid because
+  `open()` already confirmed the page loaded.
+- **Observability.** SLF4J console logging of scenario start/finish/status and
+  browser init; Cucumber `pretty`/`summary` console output; HTML, JSON, and
+  JUnit-XML reports; PNG screenshots attached to the scenario on failure. An
+  `FR-001` failure message should carry the exact missing control names, so
+  triage needs no re-run.
+- **Gap.** No log file, no aggregation, no run-history retention is planned.
+  There is no "production" to monitor — the framework is run on demand.
 
 ## Scalability and Performance
 
-- **`FR-001` happy path is fast.** All seven controls are already visible when the
-  group runs (`open()` gated on the Username field), so each check resolves on its
-  first poll.
-- **Worst case is bounded and sequential.** The seven checks each use an independent
-  3 s visibility wait, so an all-controls-missing failure costs up to ~21 s. This is
-  the accepted price of naming *every* missing control instead of short-circuiting.
-- **Primary bottleneck** is browser startup plus real network latency to the external
-  demo site — both dominated by per-scenario session creation in `Hooks`, which is
-  accepted in exchange for isolation.
-- **Parallelism is prepared but not enabled.** `DriverManager` uses
-  `ThreadLocal<WebDriver>` and `LoginSteps` holds no static state, so the design is
-  thread-safe. However `pom.xml` sets no Surefire `parallel`/`forkCount`, and the
-  JUnit 4 `@RunWith(Cucumber.class)` runner does not support parallel scenarios.
-  Enabling parallelism would require migrating to `cucumber-junit-platform-engine`
-  (JUnit 5) or the Cucumber CLI with a forked Surefire — **out of scope for `FR-001`**
-  and noted here so no downstream agent assumes parallel execution already works.
-  `ConfigReader`'s singleton is read-only after initialisation and safe under
-  parallelism; `ConfigReaderTest`'s system-property mutation is the one component that
-  would need isolation first.
-- **Suite scale.** Twelve scenarios today; growth is linear. The architecture scales
-  by adding scenarios and Page Objects, not by restructuring layers.
+- **`FR-001` happy path is fast.** All six controls should already be visible
+  when the group runs (`open()` gated on the Username field), so each check
+  resolves on its first poll.
+- **Worst case is bounded and sequential.** Each control check uses an
+  independent short visibility wait, so an all-controls-missing failure is
+  bounded by the sum of those timeouts — the accepted price of naming *every*
+  missing control instead of short-circuiting.
+- **Primary bottleneck** is browser startup plus real network latency to the
+  external demo site, both dominated by per-scenario session creation in
+  `Hooks`, accepted in exchange for isolation.
+- **Parallelism is prepared but not enabled.** `DriverManager`'s
+  `ThreadLocal<WebDriver>` design is thread-safe, but the JUnit 4
+  `@RunWith(Cucumber.class)` runner does not support parallel scenarios without
+  migrating to `cucumber-junit-platform-engine` (JUnit 5) or a forked Surefire —
+  **out of scope for `FR-001`**, noted so no downstream agent assumes parallel
+  execution works out of the box.
+- **Suite scale.** One scenario today (`@TS_LOG_001`); growth is linear. The
+  architecture scales by adding scenarios and Page Objects, not by restructuring
+  layers.
 
 ## Deployment
 
-There is nothing to deploy — the framework is a **build-and-run test artifact**, and
-the system under test is an externally operated site.
+There is nothing to deploy — the framework is a **build-and-run test artifact**,
+and the system under test is an externally operated site.
 
-- **Build:** `mvn clean install -DskipTests` (JDK 11+, Maven). No virtual env or
-  separate package step; Maven resolves everything from `pom.xml`.
-- **Run:** `mvn test` from the repository root. Single scenario:
-  `mvn test -Dcucumber.filter.tags="@TS_LOG_008"` (the `FR-001` scenario). Runtime
-  overrides: `-Dbrowser=firefox -Dheadless=true`, `-Dvalid.username=... -Dvalid.password=...`.
-- **Prerequisites:** a local browser matching `browser`, and network access to both
-  the demo site and the WebDriverManager driver cache on a cold start.
-- **Outputs:** `target/cucumber-reports/{cucumber-html-report.html, cucumber.json,
-  cucumber-junit.xml}` plus embedded failure screenshots.
-- **CI/CD:** **Not Found.** `.github/` contains only `modernize/java-upgrade`
-  scaffolding — there is no workflow that builds or runs this suite, and no published
-  report or artifact retention. `headless=true` and `-D` secret injection already make
-  the framework CI-ready, so adding a workflow is a small, self-contained change.
-  **Ruled on by `DR-022`:** flagged as a real gap but deliberately not fixed in this
-  run — local, on-demand verification is the accepted operating model for the capstone
-  (Step 7 supplies the execution evidence), with the consequence that Step 8's PR
-  carries no automated check. Escalated to the user for confirmation.
+- **Build:** `mvn clean install -DskipTests` (JDK 11+, Maven), per
+  `.claude/CLAUDE.md`. No virtual env or separate package step once `pom.xml` is
+  added in Step 5.
+- **Run:** `mvn test` from the repository root; single-scenario run via
+  `-Dcucumber.filter.tags="@TS_LOG_001"`. Runtime overrides:
+  `-Dbrowser=firefox -Dheadless=true`, `-Dvalid.username=... -Dvalid.password=...`.
+- **Prerequisites:** a local browser matching `browser`, and network access to
+  both the demo site and the WebDriverManager driver cache on a cold start.
+- **Outputs:** Cucumber HTML/JSON/JUnit-XML reports plus embedded failure
+  screenshots, once Step 5 wires up `TestRunner`.
+- **CI/CD:** **Not Found.** `.github/` on this branch contains only
+  `modernize/java-upgrade` scaffolding (confirmed via `git ls-files .github`) —
+  there is no workflow that builds or runs this suite, and no published report
+  or artifact retention. `headless=true` and `-D` secret injection already make
+  the proposed design CI-ready, so adding a workflow is a small, self-contained
+  follow-on change. Flagged as a gap, not fixed in this document; escalated to
+  the user for confirmation of local-only verification as the accepted model.
 
 ## Assumptions and Constraints
 
-**Confirmed constraints (verified in the repository):**
+**Confirmed constraints (verified against the repository and `.claude/CLAUDE.md`):**
 
-- No application source under test lives here; the target is the live, externally
-  hosted `https://opensource-demo.orangehrmlive.com` instance named in `AC-001`.
-- All code is under `src/test/java` — there is no `src/main`. The Maven artifact is a
-  test framework, not a deployable application.
-- Step definitions must contain no direct Selenium calls; locators and waits live only
-  in `pages/*` (project convention, `.claude/CLAUDE.md`).
+- No application source under test lives here; the target is the live,
+  externally hosted `https://opensource-demo.orangehrmlive.com` instance named
+  in `AC-001`.
+- No `pom.xml` or `src/` tree exists on this branch (`test/pipeline-rerun`) as of
+  this writing — confirmed via `git ls-files`. All code referenced in this
+  document is **to be created in Step 5**, under `src/test/java` only (test
+  framework, not a deployable application), per `.claude/CLAUDE.md`.
+- Step definitions must contain no direct Selenium calls; locators and waits
+  live only in `pages/*` (project convention, `.claude/CLAUDE.md`).
 - No implicit wait anywhere; explicit waits only.
-- Surefire runs only `**/TestRunner.java` and `**/*Test.java`; `ConfigReaderTest` is
-  the only unit test and is scoped to `ConfigReader`'s security guards, not general
-  logic.
-- `FR-001` is verified by exactly one scenario, `@TS_LOG_008`, and its three
+- `FR-001` is to be verified by exactly one scenario, `@TS_LOG_001`, with its
   `// FR-001`-tagged step methods.
-- The footer's visibility is established **transitively and sufficiently** by its two
-  descendant checks: both locators are descendant-scoped to `.orangehrm-login-footer`,
-  so a match is impossible unless that container is in the DOM, and
-  `visibilityOfElementLocated` on a descendant cannot succeed while an ancestor is
-  `display:none` or zero-sized. No footer-container locator is needed, and a direct
-  container check would be *weaker* (a visible empty footer would pass it). Confirmed
-  by `DR-021`; previously listed below as an assumption.
+- `.claude/CLAUDE.md`'s "Application architecture" section already names
+  `DashboardPage` and `ResetPasswordPage` as part of the target structure; this
+  document carries them forward as out-of-scope placeholders rather than
+  omitting them, so Step 4/5 do not need to re-derive the target layout.
 
-**Assumptions (not verifiable from this repository alone):**
+**Assumptions (not verifiable from the repository alone):**
 
-- The demo site's hand-authored CSS class fragments used by the `FR-001` locators
-  (`.orangehrm-login-branding img`, `.orangehrm-login-forgot-header`,
-  `.orangehrm-login-footer .orangehrm-copyright-wrapper`,
-  `.orangehrm-login-footer .orangehrm-login-footer-sm a`) remain stable. The code
-  comments state these were confirmed against the live DOM, but the demo site is
-  third-party and can change without notice — the single largest `FR-001` fragility.
-- The demo site is reachable and not rate-limiting; `@TS_LOG_008` cannot pass offline,
-  and this framework has no stub or recorded-DOM fallback.
-- ~~`FR-001`'s "footer" is treated as satisfied by one visible copyright element plus
-  at least one visible social link.~~ **Superseded by `DR-019`:** one visible social
-  link is *not* sufficient for `AC-001`'s plural "social links". The assertion is to
-  tighten to a minimum visible count in Step 4; until that task lands, the
-  one-link check is a known coverage gap rather than an accepted interpretation.
-  (The footer-inference half of this assumption is now a confirmed constraint above,
-  per `DR-021`.)
+- The demo site's current DOM structure (class names, element hierarchy for the
+  logo, forgot-password link, and footer) is stable enough to locate reliably;
+  it has not been inspected as part of this design (no browser automation ran
+  during Step 2). The Implementation agent (Step 5) must confirm exact selectors
+  against the live DOM before coding `LoginPage`.
+- The demo site is reachable and not rate-limiting; `@TS_LOG_001` cannot pass
+  offline, and this framework will have no stub or recorded-DOM fallback.
+- `artifacts/design-review.md` and `artifacts/impl-plan.md`, currently present
+  in the repository, were produced against a **prior** architecture baseline
+  (commit `b448cb4`) that assumed code already existed. Because this document
+  re-derives the architecture from the current `artifacts/requirements.md`
+  rather than from that prior file, those two downstream artifacts are now
+  stale with respect to this document and will need to be reconciled or rerun
+  when Steps 3 and 4 next execute.
 
 ## Risks and Mitigations
 
 | Risk | Likelihood | Impact | Mitigation |
 | --- | --- | --- | --- |
-| Third-party demo-site markup change breaks an `FR-001` locator | Medium | High — `@TS_LOG_008` fails with no product defect | Locators scoped to hand-authored `orangehrm-*` class fragments rather than generated `oxd-*` chains; all confined to `LoginPage`, so the fix is one file. Failure message names the exact control. |
-| Demo site unreachable, slow, or rate-limiting | Medium | High — suite cannot run | 30 s page-load and 15 s explicit-wait timeouts fail fast with a clear message; failure screenshot distinguishes "site down" from "control missing". No mitigation for sustained outage (accepted: no stub layer). |
-| `@TS_LOG_008` couples `FR-001` to the out-of-scope `NFR-002` HTTPS step | High (already the case) | Medium — an `NFR-002` regression reports as a failure of the `FR-001` scenario | **Resolved by `DR-020`:** the step moves to its own `@TS_LOG_013` scenario in Step 4, inheriting the same `Background`, which fully decouples the two requirements without losing the pre-submit check. Until then, step-level reporting still identifies which step failed. |
-| `@TS_LOG_008`'s three `FR-001` assertions span two concerns (presence and placeholder text) | Confirmed | Low | Each is a separate step with its own assertion, so the report pinpoints which one failed. |
-| Only one social link is asserted though `FR-001` says "social links" (plural) | Confirmed | Medium — a partial footer regression passes | **Accepted as a finding by `DR-019`** (not as an interpretation): tighten to a minimum visible count in a named constant, within the 3 s group budget. Note `BasePage.waitForAllVisible` currently has no callers and uses the 15 s `explicit.wait`, so it needs an explicit-timeout variant rather than reuse as-is (`DR-026`). |
-| `FR-001`'s quoted labels `"Login"` / `"Forgot your password?"` are located structurally but never text-asserted | Confirmed (found in Step 3) | Medium — a relabelled control passes `@TS_LOG_008` | **Accepted as a finding by `DR-023`:** add `LoginPage` text readers plus two `Then` steps comparing whitespace-normalised labels, mirroring the existing placeholder-assertion pattern. |
-| Code cites `AD-###` / `DR-###` / `TASK-###` IDs whose source documents are absent from `artifacts/` | Confirmed | Medium — broken traceability chain; risk of ID collision if new IDs are minted | **Resolved by `DR-018`:** this document mints no new `AD-###` IDs, preserves the cited ones with their inferred meaning, and § Traceability now fixes the allocation rule (`AD-010`+ / `DR-030`+ / `TASK-012`+, retired ranges never reused). |
-| Browser auto-update outpaces the driver binary | Low | Medium | WebDriverManager resolves matching binaries per run; `DriverManager` logs the browser and quits a half-initialised session. |
-| Demo credentials repointed at a non-public environment | Low | High | `ConfigReader.getValidPassword()` refuses the committed value off the demo host; `pre_implementation.md` requires confirming `base.url` before any change. Not on `FR-001`'s path (it needs no credentials). |
-| Latent parallelism assumed to be active | Medium | Low-Medium — misleading capacity expectations | Documented explicitly in Scalability: `ThreadLocal` is in place but the JUnit 4 runner and Surefire config do not execute scenarios in parallel. |
-
-## Traceability
-
-| FR/NFR | Architecture component | Specification | Code | Status |
-| --- | --- | --- | --- | --- |
-| `FR-001` (`AC-001`) | `LoginPage` (`findMissingLoginControls`, `getUsernamePlaceholder`, `getPasswordPlaceholder`, `open`) → `BasePage` → `DriverManager` / `ConfigReader` | `features/login.feature` `@TS_LOG_008` | `LoginSteps.all_required_login_controls_should_be_displayed()`, `.the_username_field_placeholder_should_be()`, `.the_password_field_placeholder_should_be()` (all tagged `// FR-001`) | Implemented — covered, no orphan |
-| `NFR-002` | `ConfigReader.getBaseUrl()` (preventive guard); `LoginSteps.the_current_page_should_be_served_over_https()` (executed, defence-in-depth) | `@TS_LOG_008` and `@TS_LOG_001` (`# NFR-002` comments) | `ConfigReader`, `LoginSteps`, `ConfigReaderTest` | Implemented — **out of scope for `FR-001`**; mapped here for completeness only, per `artifacts/requirements.md` § Out of Scope |
-
-**ID allocation rule (decided by `DR-018`, Step 3).** This document at commit
-`b448cb4` is the numbering baseline. New IDs are allocated strictly **above every ID
-cited anywhere in the code**, because a prior document demonstrably numbered as far as
-`DR-017` even though `DR-004`-`DR-016` are uncited:
-
-| ID family | Next free ID | Permanently retired — never reuse, renumber, or reinterpret |
-| --- | --- | --- |
-| `AD-###` (architecture decision) | `AD-010` | `AD-001` - `AD-009` |
-| `DR-###` (design-review finding) | `DR-030` (`DR-018`-`DR-029` used by Step 3) | `DR-001` - `DR-017` |
-| `TASK-###` (implementation task) | `TASK-012` | `TASK-001` - `TASK-011` |
-
-The retired IDs keep their existing code comments untouched and stay listed below as
-`Not Found` provenance.
-
-Pre-existing decision/task IDs referenced by code comments, whose defining documents
-are **not present** in `artifacts/`:
-
-| ID cited in code | Cited at | Inferred meaning | Source document |
-| --- | --- | --- | --- |
-| `AD-008` | `LoginPage.java:33` | Footer locators keyed on stable hand-authored class fragments, not generated `oxd-*` chains | `Not Found` |
-| `AD-009` | `LoginSteps.java:189` | The executed HTTPS scheme check is defence-in-depth, not prevention | `Not Found` |
-| `DR-001` | `ConfigReaderTest.java:76` | `getBaseUrl()` fail-closed path | `Not Found` |
-| `DR-002`, `DR-003` | `LoginPage.java:38,158` | Report every missing control, not a short-circuited boolean; single short timeout for the group | `Not Found` |
-| `DR-017` | `ConfigReader.java:109` | Insecure opt-out must leave a detectable one-time trace | `Not Found` |
-| `TASK-001`, `TASK-002`, `TASK-003`, `TASK-011` | `ConfigReaderTest.java:19,21,27,114`; `pom.xml:97` | HTTPS guard, shared-JVM test scoping, Surefire include pattern, opt-out warning latch | `Not Found` |
+| Third-party demo-site markup change breaks an `FR-001` locator before or after implementation | Medium | High — `@TS_LOG_001` fails with no product defect | Locators should prefer stable, hand-authored class fragments over generated/utility class chains; all confined to `LoginPage`, so the fix is one file. Failure message should name the exact control. |
+| Demo site unreachable, slow, or rate-limiting | Medium | High — suite cannot run | Page-load and explicit-wait timeouts from `config.properties` should fail fast with a clear message; failure screenshot should distinguish "site down" from "control missing". No mitigation for sustained outage (accepted: no stub layer). |
+| `NFR-002` is cited by convention (`.claude/CLAUDE.md`) but not defined in any approved requirement | Confirmed | Medium — a requirement implied by code/config exists with no measurable acceptance criterion, so Step 7 cannot verify it against an approved artifact | Flagged as an open question for the user/Step 1, below. This document implements the HTTPS guard as a convention, not as proof of NFR-002 compliance. |
+| Downstream artifacts (`design-review.md`, `impl-plan.md`) predate this rerun and reference a different architecture baseline | Confirmed | Medium — risk of ID collision or contradictory guidance if Steps 3/4 are resumed without reconciliation | Called out explicitly in Assumptions; Step 3 should treat this document, not the prior file, as the current baseline. |
+| Browser auto-update outpaces the driver binary | Low | Medium | WebDriverManager should resolve matching binaries per run; `DriverManager` should log the browser and quit a half-initialized session. |
+| Parallelism is designed for (`ThreadLocal`) but not enabled by the chosen runner | Medium | Low-Medium — misleading capacity expectations if assumed active | Documented explicitly in Scalability: the JUnit 4 runner and default Surefire config do not execute scenarios in parallel. |
 
 ## Open Questions
 
-All five questions raised by Step 2 were ruled on by the Design Review Agent (Step 3)
-in `artifacts/design-review.md`. The rulings are summarised below so no downstream
-agent re-opens a settled question; `artifacts/design-review.md` holds the full
-finding, impact, and recommendation for each.
-
-| Step 2 question | Ruling (Step 3) | Finding | Disposition |
-| --- | --- | --- | --- |
-| 1. Orphaned `AD-###` / `DR-###` / `TASK-###` IDs | **Option (a).** This document (commit `b448cb4`) is the numbering baseline; new IDs are allocated strictly **above every cited ID** — `AD-010`+, `DR-018`+, `TASK-012`+. Reconstructing the prior documents (b) and renumbering the code comments (c) were both rejected. See § Traceability for the rule. | `DR-018` | Resolved |
-| 2. Does "social links" require more than one link? | **A real coverage gap, not an accepted one.** The plural is explicit in approved requirement text, so the assertion must tighten to a minimum visible social-link count (≥ 2) held in a named constant, within the existing 3 s per-control budget. Routed to Step 4 as a task. | `DR-019` (with `DR-026`) | Accepted — Step 4 |
-| 3. Should the `NFR-002` HTTPS step stay inside `@TS_LOG_008`? | **No — split it.** The step moves to its own scenario (`@TS_LOG_013`), inheriting the same `Background` so coverage is split rather than reduced; the `@TS_LOG_001` occurrence stays. Bundling was rejected: one scenario per requirement is what the traceability chain depends on, and the preventive `ConfigReader` guard is unaffected. Routed to Step 4. | `DR-020` | Accepted — Step 4 |
-| 4. Is the footer itself asserted, or only inferred? | **Inference is sufficient; no change.** Descendant-scoped visibility is strictly stronger evidence than a container check, which a visible-but-empty footer would pass. No eighth control is added. Now recorded as a confirmed constraint, not an assumption. | `DR-021` | Closed — accepted |
-| 5. Is the absence of CI intentional? | **In scope to flag, out of scope to fix in this run.** Local, on-demand execution is the accepted operating model for the capstone; the gap stays on the record and the framework stays CI-ready. Escalated to the user for confirmation. | `DR-022` | Deferred — user |
-
-Two questions remain genuinely open, both requiring a **user** decision and neither
-blocking Step 4:
-
-- **`DR-024` — `NFR-002` is cited everywhere but defined nowhere.** This document, the
-  feature file, `ConfigReader`, `ConfigReaderTest`, and `LoginSteps` all reference
-  `NFR-002`, yet `artifacts/requirements.md` mentions it only inside § Out of Scope as
-  a pointer to work "tracked separately" — there is no `NFR-002` statement, measurable
-  target, or acceptance criterion in any artifact, and no `NFR-001` exists. Choose:
-  (i) amend `requirements.md` via a Step 1 revision with a measurable `NFR-002`, or
-  (ii) record `NFR-002` formally as inherited from unavailable prior work and out of
-  scope, accepting that Step 7 cannot verify it. Neither Step 2 nor Step 3 may invent
-  the definition.
-- **`DR-022` — confirm local-only verification.** See the table above. Without a
-  workflow there is no push/PR regression signal and no report retention, and Step 8
-  will open a PR with no automated check attached.
-
-Additionally, `DR-023` (raised in Step 3, not by this document) found that `FR-001`'s
-quoted control labels `"Login"` and `"Forgot your password?"` are located structurally
-but never text-asserted, unlike the two placeholders. Accepted and routed to Step 4.
+- **Is `NFR-002` (HTTPS transport) a real, approved non-functional requirement,
+  or only a project convention?** `.claude/CLAUDE.md` describes an HTTPS
+  fail-closed guard and labels it `NFR-002`, but `artifacts/requirements.md`
+  mentions `NFR-002` only inside § Out of Scope as a pointer to work "tracked
+  separately" — there is no `NFR-002` statement, measurable target, or
+  acceptance criterion in any approved artifact, and no `NFR-001` exists. This
+  document adopts the guard as a design convention (`AD-004`) but does not treat
+  `FR-001` as depending on it, and cannot itself define or approve `NFR-002`.
+  Recommend one of: (i) amend `requirements.md` via a Step 1 revision with a
+  measurable `NFR-002` statement, or (ii) record `NFR-002` formally as an
+  inherited, out-of-scope project convention, accepting that Step 7 cannot
+  verify it against an approved requirement. Escalating to the user rather than
+  silently choosing a default.
+- **Should Steps 3 and 4 treat the existing `artifacts/design-review.md` and
+  `artifacts/impl-plan.md` as stale?** Both were produced against the prior
+  architecture baseline (commit `b448cb4`), which assumed implemented code that
+  is not present on this branch. This document does not resolve that
+  reconciliation — it is a Step 3/4 decision — but flags it so the next agent
+  does not silently build on a superseded document.
+- **Exact demo-site selectors for the six `FR-001` controls.** Not determined
+  during this architecture step (no live-DOM inspection was performed); Step 5
+  must confirm them against the real page before implementing `LoginPage`.
+- **Is local-only, on-demand verification (no CI workflow) the accepted
+  operating model for this capstone?** Confirmed as the current state (no
+  workflow exists beyond `java-upgrade` scaffolding); flagging for explicit user
+  confirmation since it means Step 8's PR will carry no automated check.
