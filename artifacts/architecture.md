@@ -370,13 +370,16 @@ and the system under test is an externally operated site.
   against the live DOM before coding `LoginPage`.
 - The demo site is reachable and not rate-limiting; `@TS_LOG_001` cannot pass
   offline, and this framework will have no stub or recorded-DOM fallback.
-- `artifacts/design-review.md` and `artifacts/impl-plan.md`, currently present
-  in the repository, were produced against a **prior** architecture baseline
-  (commit `b448cb4`) that assumed code already existed. Because this document
-  re-derives the architecture from the current `artifacts/requirements.md`
-  rather than from that prior file, those two downstream artifacts are now
-  stale with respect to this document and will need to be reconciled or rerun
-  when Steps 3 and 4 next execute.
+- **Resolved by Design Review `DR-002`** (moved here from Assumptions, since it
+  is no longer unverified): `artifacts/design-review.md` and
+  `artifacts/impl-plan.md` were produced against a **prior** architecture
+  baseline (commit `b448cb4`) that assumed code already existed.
+  `artifacts/design-review.md` has been fully rewritten against this document
+  (not amended) and its finding numbering reset to `DR-001`+.
+  `artifacts/impl-plan.md` remains stale and is **pending regeneration** by the
+  Planner Agent (Step 4) against this document and the new
+  `artifacts/design-review.md`, with task numbering reset to `TASK-001`+ — not
+  reconciled with its current `TASK-012`–`TASK-018` content.
 
 ## Risks and Mitigations
 
@@ -384,8 +387,8 @@ and the system under test is an externally operated site.
 | --- | --- | --- | --- |
 | Third-party demo-site markup change breaks an `FR-001` locator before or after implementation | Medium | High — `@TS_LOG_001` fails with no product defect | Locators should prefer stable, hand-authored class fragments over generated/utility class chains; all confined to `LoginPage`, so the fix is one file. Failure message should name the exact control. |
 | Demo site unreachable, slow, or rate-limiting | Medium | High — suite cannot run | Page-load and explicit-wait timeouts from `config.properties` should fail fast with a clear message; failure screenshot should distinguish "site down" from "control missing". No mitigation for sustained outage (accepted: no stub layer). |
-| `NFR-002` is cited by convention (`.claude/CLAUDE.md`) but not defined in any approved requirement | Confirmed | Medium — a requirement implied by code/config exists with no measurable acceptance criterion, so Step 7 cannot verify it against an approved artifact | Flagged as an open question for the user/Step 1, below. This document implements the HTTPS guard as a convention, not as proof of NFR-002 compliance. |
-| Downstream artifacts (`design-review.md`, `impl-plan.md`) predate this rerun and reference a different architecture baseline | Confirmed | Medium — risk of ID collision or contradictory guidance if Steps 3/4 are resumed without reconciliation | Called out explicitly in Assumptions; Step 3 should treat this document, not the prior file, as the current baseline. |
+| `NFR-002` is cited by convention (`.claude/CLAUDE.md`) but not defined in any approved requirement | Confirmed | Medium — a requirement implied by code/config exists with no measurable acceptance criterion, so Step 7 cannot verify it against an approved artifact | **Ruled by `DR-001`:** accepted as an inherited convention for this run; `AD-004` proceeds on that basis. Final choice of amending `requirements.md` remains escalated to the user — see `artifacts/design-review.md`. |
+| Downstream artifacts (`design-review.md`, `impl-plan.md`) predate this rerun and reference a different architecture baseline | Confirmed | Medium — risk of ID collision or contradictory guidance if Steps 3/4 are resumed without reconciliation | **Ruled by `DR-002`:** `design-review.md` rewritten against this document, numbering reset to `DR-001`+; `impl-plan.md` pending regeneration by the Planner Agent at `TASK-001`+, not reconciliation with the stale `TASK-012`+ content. |
 | Browser auto-update outpaces the driver binary | Low | Medium | WebDriverManager should resolve matching binaries per run; `DriverManager` should log the browser and quit a half-initialized session. |
 | Parallelism is designed for (`ThreadLocal`) but not enabled by the chosen runner | Medium | Low-Medium — misleading capacity expectations if assumed active | Documented explicitly in Scalability: the JUnit 4 runner and default Surefire config do not execute scenarios in parallel. |
 
@@ -399,21 +402,35 @@ and the system under test is an externally operated site.
   acceptance criterion in any approved artifact, and no `NFR-001` exists. This
   document adopts the guard as a design convention (`AD-004`) but does not treat
   `FR-001` as depending on it, and cannot itself define or approve `NFR-002`.
-  Recommend one of: (i) amend `requirements.md` via a Step 1 revision with a
-  measurable `NFR-002` statement, or (ii) record `NFR-002` formally as an
-  inherited, out-of-scope project convention, accepting that Step 7 cannot
-  verify it against an approved requirement. Escalating to the user rather than
-  silently choosing a default.
+  **Ruled by Design Review `DR-001`:** accepted as an inherited convention for
+  this run (option ii) so Step 5 is not blocked; the final choice between
+  amending `requirements.md` (option i) and formally recording the convention
+  (option ii) remains escalated to the user — see `artifacts/design-review.md`
+  § Open Questions.
 - **Should Steps 3 and 4 treat the existing `artifacts/design-review.md` and
   `artifacts/impl-plan.md` as stale?** Both were produced against the prior
   architecture baseline (commit `b448cb4`), which assumed implemented code that
-  is not present on this branch. This document does not resolve that
-  reconciliation — it is a Step 3/4 decision — but flags it so the next agent
-  does not silently build on a superseded document.
+  is not present on this branch. **Ruled by Design Review `DR-002`:** confirmed
+  stale. `artifacts/design-review.md` has been fully rewritten against this
+  document (no amendment of the prior content); finding numbering reset to
+  `DR-001`+ since no `src/`/`pom.xml` on this branch cites any prior ID.
+  `artifacts/impl-plan.md` remains stale and must be **regenerated from
+  scratch** by the Planner Agent (Step 4) against this document and the new
+  `artifacts/design-review.md`, with task numbering reset to `TASK-001`+ for the
+  same reason — not amended or reconciled with its current `TASK-012`–`TASK-018`
+  content.
 - **Exact demo-site selectors for the six `FR-001` controls.** Not determined
-  during this architecture step (no live-DOM inspection was performed); Step 5
-  must confirm them against the real page before implementing `LoginPage`.
+  during this architecture step (no live-DOM inspection was performed).
+  **Ruled by Design Review `DR-003`:** does not block Step 4 planning (tasks
+  describe behavior, not selector strings); does block finalizing `LoginPage`'s
+  locator constants — Step 5 must confirm selectors against the live DOM before
+  implementing `LoginPage`.
 - **Is local-only, on-demand verification (no CI workflow) the accepted
-  operating model for this capstone?** Confirmed as the current state (no
-  workflow exists beyond `java-upgrade` scaffolding); flagging for explicit user
-  confirmation since it means Step 8's PR will carry no automated check.
+  operating model for this capstone?** Confirmed as the current state —
+  re-confirmed during Step 3: `.github/` is **entirely untracked/git-ignored**
+  (`git ls-files .github` returns nothing; `git status --ignored` shows
+  `.github/` as ignored) and contains only `modernize/java-upgrade` tool-use
+  scaffolding on disk, with no `workflows/` directory anywhere. No committed CI
+  workflow exists by any measure. **Ruled by Design Review `DR-004`:** confirmed
+  accepted for this rerun; revisit only if the user requests a CI workflow as
+  separately-scoped follow-on work.
