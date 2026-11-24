@@ -88,6 +88,21 @@
       <version>${slf4j.version}</version>
       <scope>test</scope>
     </dependency>
+
+    <!--
+      TASK-012 addition (not in the original AD-001 stack table): JUnit 4 has
+      no supported API to set an environment variable for the running JVM,
+      and ConfigReaderTest (AD-004) must deterministically prove env >
+      file precedence without OS-level setup. system-rules' EnvironmentVariables
+      @Rule is the established way to do this; it requires the add-opens
+      flags configured on the Surefire argLine below.
+    -->
+    <dependency>
+      <groupId>com.github.stefanbirkner</groupId>
+      <artifactId>system-rules</artifactId>
+      <version>1.19.0</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -113,6 +128,8 @@
             <include>**/TestRunner.java</include>
             <include>**/*Test.java</include>
           </includes>
+          <!-- Required by ConfigReaderTest's system-rules EnvironmentVariables @Rule (TASK-012) on JDK 9+. -->
+          <argLine>--add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
         </configuration>
       </plugin>
     </plugins>
