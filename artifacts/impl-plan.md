@@ -109,7 +109,11 @@ decision:
 
 ### TASK-001: Bootstrap the Maven project and package skeleton
 
-- **Status:** Not started
+- **Status:** Done — implemented and committed as `63ff6ea`. Files: `pom.xml`;
+  `src/test/java/com/orangehrm/{config,driver,hooks,pages,stepdefinitions,runner}`
+  and `src/test/resources/features` directories. Validation: `mvn clean
+  install -DskipTests` → BUILD SUCCESS; `mvn dependency:tree` resolved every
+  declared dependency.
 - **Priority:** High
 - **FR/NFR:** FR-001 (enabling)
 - **Architecture section:** § Technology Choices (`AD-001`), § Deployment, § Component Diagram (Build and execution)
@@ -132,7 +136,12 @@ decision:
 
 ### TASK-002: Confirm live-DOM selectors for the six FR-001 controls (spike)
 
-- **Status:** Not started
+- **Status:** Done — recorded (not committed as production code) as `f5ad120`.
+  Full selector inventory is in that commit message; consumed by TASK-007's
+  `LoginPage` locator constants. Validation: a throwaway headless-Chrome
+  spike (deleted before commit) confirmed each of the six locators resolved
+  to exactly one visible element, and both placeholder attributes read the
+  literal values `"Username"` / `"Password"`.
 - **Priority:** High
 - **FR/NFR:** FR-001 (`AC-001`)
 - **Architecture section:** § Assumptions and Constraints (demo-site DOM not inspected), § Open Questions (exact selectors), § Risks and Mitigations (markup-change risk)
@@ -161,7 +170,11 @@ decision:
 
 ### TASK-003: Declare the environment in config.properties
 
-- **Status:** Not started
+- **Status:** Done — implemented and committed as `332e782`. Files:
+  `src/test/resources/config.properties`. Validation: all named keys present
+  with documented defaults; `base.url` is `https` and matches the `AC-001`
+  URL exactly; no real secret committed (no credential keys added, per
+  scope).
 - **Priority:** High
 - **FR/NFR:** FR-001 (supplies target URL and timeouts)
 - **Architecture section:** § Key Components (`config.properties`), § Technology Choices (`AD-004`)
@@ -181,7 +194,10 @@ decision:
 
 ### TASK-004: Implement ConfigReader with resolution precedence and the HTTPS fail-closed guard
 
-- **Status:** Not started
+- **Status:** Done — implemented and committed as `0d8cb1c`. Files:
+  `src/test/java/com/orangehrm/config/ConfigReader.java`. Validation:
+  compiles under `mvn clean install -DskipTests`; behaviour verified by
+  TASK-012's `ConfigReaderTest` (7/7 passing).
 - **Priority:** High
 - **FR/NFR:** FR-001 (supplies target URL and timeouts)
 - **Architecture section:** § Technology Choices (`AD-004`), § Key Components (`config.ConfigReader`), § Security Considerations (Transport, Secret hygiene)
@@ -207,7 +223,12 @@ decision:
 
 ### TASK-005: Implement DriverManager (ThreadLocal WebDriver lifecycle)
 
-- **Status:** Not started
+- **Status:** Done — implemented and committed as `36d8122`. Files:
+  `src/test/java/com/orangehrm/driver/DriverManager.java`. Validation:
+  `mvn test` launched exactly one Chrome session per scenario with clean
+  teardown; `-Dbrowser=safari` produced a clear `IllegalArgumentException`;
+  `grep -rn "implicitlyWait" src/` found no call, only the explanatory
+  comment.
 - **Priority:** High
 - **FR/NFR:** FR-001 (supporting)
 - **Architecture section:** § Technology Choices (`AD-005`), § Key Components (`driver.DriverManager`), § Reliability and Observability
@@ -232,7 +253,10 @@ decision:
 
 ### TASK-006: Implement BasePage explicit-wait helpers
 
-- **Status:** Not started
+- **Status:** Done — implemented and committed as `8b1522a`. Files:
+  `src/test/java/com/orangehrm/pages/BasePage.java`. Validation: compiles
+  under `mvn clean install -DskipTests`; exercised end-to-end by the
+  passing `@TS_LOG_001` run (TASK-011).
 - **Priority:** High
 - **FR/NFR:** FR-001 (supporting)
 - **Architecture section:** § Technology Choices (`AD-003`), § Key Components (`pages.BasePage`), § Reliability and Observability (Failure handling)
@@ -254,7 +278,17 @@ decision:
 
 ### TASK-007: Implement LoginPage — FR-001 locators, missing-controls check, placeholder readers
 
-- **Status:** Not started
+- **Status:** Done — implemented and committed as `f5329e8`, using the
+  TASK-002 selector inventory (unblocked). Files:
+  `src/test/java/com/orangehrm/pages/LoginPage.java`. Validation: against
+  the live page, `findMissingLoginControls()` returns an empty list (proven
+  by the passing `@TS_LOG_001` run, TASK-011); placeholder readers return
+  `"Username"` / `"Password"`; no assertion and no `Thread.sleep` in the
+  class. Independent evaluation re-verified by deliberately pointing
+  `FORGOT_PASSWORD_LINK` at a nonexistent class, re-running, confirming the
+  failure named exactly `[Forgot your password? link]` and nothing else,
+  then reverting via `git checkout --` and re-confirming the scenario
+  passes again.
 - **Priority:** High
 - **FR/NFR:** FR-001 (`AC-001`)
 - **Architecture section:** § Key Components (`pages.LoginPage`), § Technology Choices (`AD-002`, `AD-006`), § Data Flow
@@ -283,7 +317,12 @@ decision:
 
 ### TASK-008: Implement Hooks — per-scenario driver lifecycle and failure screenshots
 
-- **Status:** Not started
+- **Status:** Done — implemented and committed as `943ca1b`. Files:
+  `src/test/java/com/orangehrm/hooks/Hooks.java`. Validation: the passing
+  `@TS_LOG_001` run (TASK-011) attached no screenshot and left no browser
+  process; the deliberately-broken-locator run above (TASK-007) attached a
+  screenshot on failure while still reporting the original assertion
+  message as the cause.
 - **Priority:** High
 - **FR/NFR:** FR-001 (diagnostics and isolation)
 - **Architecture section:** § Key Components (`hooks.Hooks`), § Technology Choices (`AD-005`, `AD-007`), § Reliability and Observability (Isolation, Failure handling)
@@ -307,7 +346,10 @@ decision:
 
 ### TASK-009: Author login.feature scenario @TS_LOG_001 for AC-001
 
-- **Status:** Not started
+- **Status:** Done — implemented and committed as `56e5010`. Files:
+  `src/test/resources/features/login.feature`. Validation: `mvn test`
+  parsed and executed the file with no undefined/ambiguous step; exactly
+  one scenario; `# FR-001` comment and `@TS_LOG_001` tag present.
 - **Priority:** High
 - **FR/NFR:** FR-001 (`AC-001`)
 - **Architecture section:** § Recommended Architecture (Specification layer), § Key Components (`login.feature`), § Technology Choices (`AD-001`, `AD-006`)
@@ -331,7 +373,12 @@ decision:
 
 ### TASK-010: Implement LoginSteps — assertions binding @TS_LOG_001 to LoginPage
 
-- **Status:** Not started
+- **Status:** Done — implemented and committed as `ef76554`. Files:
+  `src/test/java/com/orangehrm/stepdefinitions/LoginSteps.java`. Validation:
+  `grep` found no `org.openqa.selenium` import or `By.` reference; every
+  step bound with no undefined/ambiguous step; the deliberate-break run
+  (TASK-007) produced the message `Missing login control(s): [Forgot your
+  password? link]`, naming the specific missing control.
 - **Priority:** High
 - **FR/NFR:** FR-001 (`AC-001`)
 - **Architecture section:** § Recommended Architecture (Glue layer), § Key Components (`stepdefinitions.LoginSteps`), § Technology Choices (`AD-002`, `AD-006`)
@@ -355,7 +402,12 @@ decision:
 
 ### TASK-011: Implement TestRunner and wire up multi-format reporting
 
-- **Status:** Not started
+- **Status:** Done — implemented and committed as `295f28b`. Files:
+  `src/test/java/com/orangehrm/runner/TestRunner.java`; Surefire includes
+  (TASK-001's `pom.xml`). Validation: `mvn test` → 1 scenario, 4 steps, all
+  passed; `mvn test -Dcucumber.filter.tags="@TS_LOG_001"` ran exactly that
+  scenario; `target/cucumber-reports/{cucumber.html,cucumber.json,
+  cucumber.xml}` all produced; no step undefined.
 - **Priority:** High
 - **FR/NFR:** FR-001 (execution and reporting)
 - **Architecture section:** § Key Components (`runner.TestRunner`), § Technology Choices (`AD-001`, `AD-007`), § Reliability and Observability (Observability)
@@ -378,7 +430,16 @@ decision:
 
 ### TASK-012: Add ConfigReader unit tests for precedence and the HTTPS guard
 
-- **Status:** Not started
+- **Status:** Done — implemented and committed as `75079fc`. Files:
+  `src/test/java/com/orangehrm/config/ConfigReaderTest.java`; `pom.xml`
+  (added the test-scoped `system-rules` dependency and a Surefire
+  `--add-opens` argLine so the `EnvironmentVariables` `@Rule` can
+  deterministically set an environment variable for the precedence test —
+  a deviation from the original AD-001 stack table, justified in the
+  commit message). Validation: `mvn test` ran all 7 cases, all passing;
+  `mvn test -Dtest=ConfigReaderTest` run twice in isolation produced
+  identical results with no leaked system property; no test cites
+  `NFR-002`.
 - **Priority:** Medium
 - **FR/NFR:** FR-001 (supporting) — guard behaviour traces to `AD-004`, not to any approved NFR (`DR-001`)
 - **Architecture section:** § Technology Choices (`AD-004`, trade-off note on singleton state in unit tests), § Security Considerations (Transport, Input validation)
